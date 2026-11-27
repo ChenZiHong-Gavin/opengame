@@ -1,4 +1,5 @@
 import { Button } from 'open-design-ui/button';
+import { IconButton } from 'open-design-ui/icon-button';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   designScenarios,
@@ -23,6 +24,7 @@ import { useI18n } from '../i18n/I18n';
 import { RemixIcon } from '../icons/RemixIcons';
 import {
   genreCovers,
+  genreHomeCovers,
   genreLabels,
   settingCovers,
   settingLabels,
@@ -160,11 +162,13 @@ export function canChoosePlayableAd(options: Partial<Pick<ModeComposerOptions, '
 /**
  * A portrait, single-player game brief with the ad option on is built as a playable ad
  * (shown to users as a money-making mini game). New briefs start with the option on and no
- * explicit layout; that unset layout counts as portrait only when no template is attached,
- * so remixing a template keeps the template's own layout and format.
+ * explicit layout; that unset layout counts as portrait when no template or a community template
+ * is attached (the Game Studio switch decides the format), so only remixing a built-in template keeps
+ * the template's own layout and format.
  */
 export function isPlayableAd(options: Pick<ModeComposerOptions, 'gameOrientation' | 'gamePlayableAd'> & Partial<Pick<ModeComposerOptions, 'gameTemplate'>>): boolean {
-  const portrait = options.gameOrientation === 'portrait' || (options.gameOrientation === null && !options.gameTemplate);
+  const portrait = options.gameOrientation === 'portrait'
+    || (options.gameOrientation === null && (!options.gameTemplate || Boolean(options.gameTemplate.external)));
   return portrait && options.gamePlayableAd && canChoosePlayableAd(options);
 }
 
@@ -1210,6 +1214,7 @@ export function ModeComposerTopBar({
   options,
   attachments,
   disabled,
+  showPlayableAdSwitch = true,
   onChange,
   onCatalogModelsChange,
   onCatalogChange,
@@ -1221,6 +1226,8 @@ export function ModeComposerTopBar({
   options: ModeComposerOptions;
   attachments?: SuperAgentResourceAttachment[];
   disabled?: boolean;
+  /** False while the Game Studio hero, which owns the money-making game switch, is on screen. */
+  showPlayableAdSwitch?: boolean;
   onChange: (patch: Partial<ModeComposerOptions>) => void;
   onCatalogModelsChange?: (models: Model[]) => void;
   onCatalogChange?: (catalog: { models: Model[]; routes: GatewayStatus['routes']; providers?: GatewayStatus['providers'] }) => void;
@@ -3476,10 +3483,28 @@ export function ModeComposerTopBar({
       );
     };
 
-    const playableAd = isPlayableAd(options);
+    // While the Game Studio hero is on screen its genre figures pick the genre, so the composer only
+    // shows the picked genre as a removable chip.
+    const heroPicksGenre = !showPlayableAdSwitch;
     return (
-      <div className="om-sa-composer-top-bar" role="group" aria-label={t('Game studio options')}>
-        {renderGameArtPicker({
+      <div className="om-sa-composer-top-bar" role="group" aria-label={t('Game studio options')} data-hero={heroPicksGenre || undefined}>
+        {heroPicksGenre ? (
+          options.gameGenre && (
+            <span className="om-sa-game-genre-chip">
+              {genreHomeCovers[options.gameGenre] && <img className="om-sa-game-pill-thumb" src={genreHomeCovers[options.gameGenre]!} alt="" />}
+              <span title={t(genreLabels[options.gameGenre])}>{t(genreLabels[options.gameGenre])}</span>
+              <IconButton
+                variant="plain"
+                type="button"
+                className="om-sa-chip-remove"
+                aria-label={t('Remove genre')}
+                disabled={disabled}
+                onClick={() => onChange({ gameGenre: null })}
+                icon={<RemixIcon name="close-line" size={12} />}
+              />
+            </span>
+          )
+        ) : renderGameArtPicker({
           menuKey: 'game-genre',
           fallbackIcon: 'gamepad-line',
           label: 'Genre',
@@ -3622,19 +3647,21 @@ export function ModeComposerTopBar({
             </div>
           </div>
         </Popover>
-        {canChoosePlayableAd(options) && (
+        {/* On a new task the Game Studio hero picks the money-making game option; this switch only
+            shows where the hero is not on screen, such as a conversation already under way. */}
+        {showPlayableAdSwitch && canChoosePlayableAd(options) && (
           <Tooltip
             label={t('Create an instantly playable portrait game with “Play again” and “Go to store” buttons added automatically.')}
             preview={<PlayableAdPreview />}
           >
             <label
               className="om-sa-composer-top-pill cursor-pointer"
-              data-active={playableAd || undefined}
+              data-active={isPlayableAd(options) || undefined}
             >
-              <span>{t('Ad-revenue game')}</span>
+              <span>{t('Playable ad', undefined, 'game mode')}</span>
               <Toggle
-                label={t('Ad-revenue game')}
-                checked={playableAd}
+                label={t('Playable ad', undefined, 'game mode')}
+                checked={isPlayableAd(options)}
                 disabled={disabled}
                 onCommit={enabled => onChange({ gamePlayableAd: enabled })}
               />

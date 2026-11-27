@@ -22,7 +22,10 @@ const STATE_ICON: Partial<Record<ShownState, string>> = {
  * WeChat publishing, right-hand panel: only where things stand. Every instruction comes from the Agent in the
  * conversation; this reads the same progress record its openmotion_game_wechat calls write.
  */
-export function WechatProgress({ session }: { session: GamePublishSession }) {
+export function WechatProgress({ session, onNotify }: {
+  session: GamePublishSession;
+  onNotify?: (message: string, tone?: 'info' | 'error') => void;
+}) {
   const { t } = useI18n();
   const wechat = session.wechat;
   const status = wechat?.status;
@@ -74,7 +77,7 @@ export function WechatProgress({ session }: { session: GamePublishSession }) {
         <strong>{line}</strong>
         <span className="om-gp-muted"> · {t('The Agent guides you in the conversation')}</span>
       </p>
-      <OpenDesignProgress session={session} />
+      <OpenDesignProgress session={session} onNotify={onNotify} />
       <ol className="om-gp-overview-list">{main.map((step, index) => item(step, index + 1))}</ol>
 
       <h3 className="om-gp-group">{mainDone ? t('Going live') : t('Going live (optional)')}</h3>
@@ -84,7 +87,10 @@ export function WechatProgress({ session }: { session: GamePublishSession }) {
 }
 
 /** The OpenDesign link (selected by default on the platform list), above the platform's steps. */
-export function OpenDesignProgress({ session }: { session: GamePublishSession }) {
+export function OpenDesignProgress({ session, onNotify }: {
+  session: GamePublishSession;
+  onNotify?: (message: string, tone?: 'info' | 'error') => void;
+}) {
   const { t } = useI18n();
   if (!session.linkToo && !session.linkUrl && !session.linkPublishing && !session.linkError) return null;
   const state: ShownState = session.linkUrl ? 'done' : session.linkError ? 'blocked' : session.linkPublishing ? 'current' : 'todo';
@@ -94,7 +100,9 @@ export function OpenDesignProgress({ session }: { session: GamePublishSession })
       <li className="om-gp-overview-item" data-state={state}>
         {icon ? <RemixIcon name={icon} size={14} className={session.linkPublishing ? 'om-gp-spin' : undefined} /> : <span className="om-gp-overview-dot" aria-hidden="true" />}
         <span className="om-gp-overview-name">OpenDesign · {t('Play link')}</span>
-        <span className="om-gp-overview-state">{session.linkUrl ? t('Done') : session.linkError ? t('Needs a fix') : session.linkPublishing ? t('Publishing…') : t('Not started')}</span>
+        {session.linkUrl
+          ? <CompactLink url={session.linkUrl} onNotify={onNotify} />
+          : <span className="om-gp-overview-state">{session.linkError ? t('Needs a fix') : session.linkPublishing ? t('Publishing…') : t('Not started')}</span>}
       </li>
     </ol>
   );
@@ -134,6 +142,24 @@ export function LinkQr({ url, size = 132 }: { url: string; size?: number }) {
   );
 }
 
+export function wechatInlineControlFlags(status: WechatPublishStatus | undefined): {
+  showKey: boolean;
+  canReplaceKey: boolean;
+  showQr: boolean;
+  any: boolean;
+} {
+  if (!status) return { showKey: false, canReplaceKey: false, showQr: false, any: false };
+  const showKey = status.current === 'key' && Boolean(status.appid);
+  // Only after WeChat refused the saved key (wrong file, or a key for another AppID); otherwise there is nothing to replace.
+  const canReplaceKey = Boolean(status.appid && status.hasKey && status.keyRejected);
+  const showQr = Boolean(status.preview) && (status.current === 'preview' || status.current === 'upload');
+  return { showKey, canReplaceKey, showQr, any: showKey || showQr || canReplaceKey };
+}
+
+export function hasWechatInlineControls(session: GamePublishSession | undefined): boolean {
+  return wechatInlineControlFlags(session?.wechat?.status).any;
+}
+
 /**
  * In the conversation, under the Agent's messages: the two WeChat steps the Agent cannot do through chat.
  * The key file goes straight from the browser to the local service (never into a message or the Agent's context);
@@ -144,12 +170,8 @@ export function WechatInlineControls({ session }: { session: GamePublishSession 
   const fileRef = useRef<HTMLInputElement>(null);
   const wechat = session.wechat;
   const status = wechat?.status;
-  if (!status) return null;
-  const showKey = status.current === 'key' && Boolean(status.appid);
-  // Only after WeChat refused the saved key (wrong file, or a key for another AppID); otherwise there is nothing to replace.
-  const canReplaceKey = Boolean(status.appid && status.hasKey && status.keyRejected);
-  const showQr = Boolean(status.preview) && (status.current === 'preview' || status.current === 'upload');
-  if (!showKey && !showQr && !canReplaceKey) return null;
+  const { showKey, canReplaceKey, showQr, any } = wechatInlineControlFlags(status);
+  if (!status || !any) return null;
   return (
     <div className="om-gp-inline">
       {(showKey || canReplaceKey) && (

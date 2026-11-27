@@ -11,7 +11,7 @@ import {
   buildPlacementId,
   cleanBillingUrl,
   currentProductId,
-  encodeMonetizationShortlink,
+  directAttributedBillingUrl,
   type MonetizationModality,
 } from '../shared/product-identity.ts';
 import { slug, validField, type EventFields } from '../tracking/core.ts';
@@ -898,8 +898,10 @@ export class OpenDesignAccount {
     if (options.telemetryEnabled === false) {
       return { url: cleanBillingUrl('d') };
     }
+    // Temporary hotfix: emit direct attributed billing URLs until open-design.ai/t/:token
+    // is deployed to production (od-landing#429), then switch back to encodeMonetizationShortlink.
     return {
-      url: encodeMonetizationShortlink({
+      url: directAttributedBillingUrl({
         target: 'd',
         entryId,
         product: currentProductId(),
@@ -917,8 +919,10 @@ export class OpenDesignAccount {
     if (options.telemetryEnabled === false) {
       return { url: cleanBillingUrl('r') };
     }
+    // Temporary hotfix: emit direct attributed billing URLs until open-design.ai/t/:token
+    // is deployed to production (od-landing#429), then switch back to encodeMonetizationShortlink.
     return {
-      url: encodeMonetizationShortlink({
+      url: directAttributedBillingUrl({
         target: 'r',
         entryId,
         product: currentProductId(),
@@ -1080,6 +1084,7 @@ export class OpenDesignAccount {
     const music = kind === 'audio' && job.model.mode === 'text-to-audio';
     const soundEffects = music && isSfxModel(job.model);
     if ((reference || references.length) && kind !== 'image' && kind !== 'video') throw new Error('Account reference images are supported for image editing and video first frames only');
+    // TODO(OPEND-5839): interim static parameter allowlist until account submission reads schema.properties dynamically and bypasses fixed vela-cli flags.
     const allowed = kind === 'image'
       ? ['aspect_ratio', 'resolution', 'quality', 'size', 'background']
       : kind === 'video'
@@ -1098,6 +1103,7 @@ export class OpenDesignAccount {
     const operation = kind === 'audio' ? music ? 'music' : 'speech' : kind === 'image' && reference ? 'edit' : 'gen';
     const referenceArgs = reference ? [kind === 'video' ? '--first-frame' : '--image', reference] : [];
     const args = [kind, operation, '--model', job.model.modelId, '--prompt', job.prompt, ...referenceArgs, '--no-wait', '--json'];
+    // TODO(OPEND-5839): interim workaround for vela-cli@0.1.10 defaulting omitted --generate-audio to false (apps/cli/internal/commands/media.go:160).
     const generateAudio = kind === 'video' && params.generate_audio === undefined && defaultVideoAudioEnabled(job.model) ? true : params.generate_audio;
     for (const [key, value] of Object.entries(direct || directSfx ? {} : params)) {
       if (key === 'generate_audio') continue;

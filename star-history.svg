@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="280" viewBox="0 0 780 280" role="img" aria-labelledby="title desc">
+  <title id="title">OpenGame star history</title>
+  <desc id="desc">Daily GitHub stars for nexu-io/opengame from 2026-11-25 to 2026-11-27. Latest total: 1,326.</desc>
+  <style>
+    svg { font: 13px system-ui, sans-serif; color: #24292f; }
+    text { fill: currentColor; }
+    .background { fill: #fff; }
+    .grid { stroke: #d1d9e0; }
+    .series { fill: none; stroke: #0969da; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+    @media (prefers-color-scheme: dark) {
+      svg { color: #e6edf3; } .background { fill: #0d1117; } .grid { stroke: #30363d; } .series { stroke: #58a6ff; }
+    }
+  </style>
+  <rect class="background" width="780" height="280" rx="10"/>
+  <text x="24" y="40" font-size="23" font-weight="600">nexu-io/opengame</text>
+  <text x="740" y="39" text-anchor="end">1,326 ★ · 2026-11-27</text>
+  <path class="grid" d="M65 226.0H740"/>
+  <text x="53" y="230.0" text-anchor="end">0</text>
+  <path class="grid" d="M65 172.0H740"/>
+  <text x="53" y="176.0" text-anchor="end">500</text>
+  <path class="grid" d="M65 118.0H740"/>
+  <text x="53" y="122.0" text-anchor="end">1k</text>
+  <path class="grid" d="M65 64.0H740"/>
+  <text x="53" y="68.0" text-anchor="end">1.5k</text>
+  <text x="65.0" y="254" text-anchor="middle">2026-11-25</text>
+  <text x="402.5" y="254" text-anchor="middle">2026-11-26</text>
+  <text x="740.0" y="254" text-anchor="middle">2026-11-27</text>
+  <polyline class="series" points="65.0,226.0 402.5,137.3 740.0,82.8"/>
+</svg>

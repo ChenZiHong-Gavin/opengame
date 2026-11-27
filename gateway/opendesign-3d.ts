@@ -964,6 +964,8 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
   let retargetRan = false;
   let finalTask: TripoTaskResult;
   let meshyAnimationLabels: string[] = [];
+  // Meshy honours parameters.target_polycount over the preset, so report the polycount actually requested.
+  const resultFaceLimit = isMeshy ? Number(meshyMeshParameters(params, faceLimit).target_polycount) : faceLimit;
 
   if (isMeshy) {
     const meshyRun = await runMeshyOperation({
@@ -1213,7 +1215,7 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
         ...(retargetRan && animation ? { animation } : {}),
         ...(retargetRan && animationsList.length > 0 ? { requestedAnimations: animationsList } : {}),
         ...(retargetRan && meshyAnimationLabels.length > 0 ? { meshyAnimations: meshyAnimationLabels } : {}),
-        faceLimit,
+        faceLimit: resultFaceLimit,
         rawBytes,
         bytes: finalGlb.bytes,
         slimmed: finalGlb.slimmed,

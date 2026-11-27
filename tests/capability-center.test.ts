@@ -1610,6 +1610,38 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
       });
       assert.deepEqual(submitted.at(-1), { path: '/openapi/v1/animations', body: { rig_task_id: 'rigging-4', action_id: 92 } });
 
+      // Skeleton-only rig on an existing base mesh saves the rigged character GLB from a single rigging task.
+      const beforeRigOnly = submitted.length;
+      const rigOnlyRun = await api.call('openmotion_capability_run', {
+        action: 'run',
+        requestId: 'meshy-rig-only-1',
+        capabilityId: '3d-asset',
+        model: 'meshy:meshy-7.1',
+        options: { operation: 'rig' },
+        parameters: { original_model_task_id: 'image-to-3d-3', slim: false },
+      });
+      assert.deepEqual(submitted.slice(beforeRigOnly).map(task => task.path), ['/openapi/v1/rigging']);
+      assert.equal(rigOnlyRun.result.taskId, rigOnlyRun.result.rigTaskId);
+      assert.ok(rigOnlyRun.asset.id);
+      assert.match(glbDownloads.at(-1)!.url, /\/rigging-\d+\/rigged\.glb/);
+
+      // texture=false on text_to_model returns the untextured preview task, and faceLimit reports target_polycount.
+      const beforeUntextured = submitted.length;
+      const untexturedRun = await api.call('openmotion_capability_run', {
+        action: 'run',
+        requestId: 'meshy-untextured-1',
+        capabilityId: '3d-asset',
+        model: 'meshy:meshy-7.1',
+        prompt: 'Blockout crate',
+        options: { operation: 'text_to_model' },
+        parameters: { texture: false, target_polycount: 50000, slim: false },
+      });
+      const untexturedTasks = submitted.slice(beforeUntextured);
+      assert.deepEqual(untexturedTasks.map(task => task.body.mode), ['preview']);
+      assert.equal(untexturedTasks[0].body.target_polycount, 50000);
+      assert.equal(untexturedRun.result.faceLimit, 50000);
+      assert.match(glbDownloads.at(-1)!.url, /\/text-to-3d-\d+\/model\.glb/);
+
       // Operations Meshy does not implement fail locally before any request.
       const beforeUnsupported = submitted.length;
       await assert.rejects(

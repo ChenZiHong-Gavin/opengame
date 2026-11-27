@@ -397,6 +397,7 @@ function spatialInputFingerprint(input: {
 function assertCheckpointMatchesInput(checkpoint: SpatialCheckpoint, fingerprint: string, requestId: string): void {
   const hasSavedState = Boolean(
     checkpoint.uploadAssetIds?.length
+    || checkpoint.previewTaskId
     || checkpoint.baseTaskId
     || checkpoint.rigTaskId
     || checkpoint.retargetTaskId

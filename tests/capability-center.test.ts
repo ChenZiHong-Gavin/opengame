@@ -1451,6 +1451,8 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
     const glbDownloads: { url: string; authorization: string | null }[] = [];
     const libraryQueries: string[] = [];
     let failNextImageTask = false;
+    let failNextPreview = false;
+    const failedPreviewIds = new Set<string>();
     let taskCounter = 0;
     const json = (body: unknown, status = 200) =>
       new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -1476,9 +1478,17 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
         const body = JSON.parse(String(init.body ?? '{}'));
         submitted.push({ path: pathname, body });
         taskCounter += 1;
-        return json({ result: `${pathname.split('/').pop()}-${taskCounter}` }, 202);
+        const taskId = `${pathname.split('/').pop()}-${taskCounter}`;
+        if (body.mode === 'preview' && failNextPreview) {
+          failNextPreview = false;
+          failedPreviewIds.add(taskId);
+        }
+        return json({ result: taskId }, 202);
       }
       const id = pathname.split('/').pop()!;
+      if (failedPreviewIds.has(id)) {
+        return json({ id, status: 'FAILED', progress: 0, task_error: { type: 'server_error', message: 'Preview interrupted' } });
+      }
       if (id.startsWith('image-to-3d') && failNextImageTask) {
         return json({ id, status: 'FAILED', progress: 0, task_error: { type: 'invalid_input', code: 'image_too_complex', message: 'Image is too complex' } });
       }
@@ -1609,6 +1619,24 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
         /Unsupported 3d-asset operation for Meshy: decimate/,
       );
       assert.equal(submitted.length, beforeUnsupported);
+
+      // A checkpoint holding only the preview task id still guards against changed inputs.
+      failNextPreview = true;
+      const previewGuardRun = {
+        action: 'run',
+        requestId: 'meshy-preview-guard-1',
+        capabilityId: '3d-asset',
+        model: 'meshy:meshy-7.1',
+        prompt: 'Wooden barrel',
+        options: { operation: 'text_to_model' },
+      };
+      await assert.rejects(api.call('openmotion_capability_run', previewGuardRun), /Preview interrupted/);
+      const beforeGuardRetry = submitted.length;
+      await assert.rejects(
+        api.call('openmotion_capability_run', { ...previewGuardRun, prompt: 'Iron anvil' }),
+        /REQUEST_ID_CONFLICT: requestId "meshy-preview-guard-1" already has a saved 3D checkpoint for different inputs/,
+      );
+      assert.equal(submitted.length, beforeGuardRetry);
 
       // Remote failures surface Meshy's task_error message.
       failNextImageTask = true;

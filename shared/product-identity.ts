@@ -69,6 +69,7 @@ type NodeUrlLike = {
   fileURLToPath(url: URL | string): string;
 };
 type NodeProcessLike = {
+  execPath?: string;
   env?: Record<string, string | undefined>;
   getBuiltinModule?: (specifier: string) => unknown;
 };
@@ -83,22 +84,42 @@ function readNodeBuiltins(): { proc: NodeProcessLike; fs: NodeFsLike; path: Node
   return { proc, fs, path, url };
 }
 
+// Read only source identity metadata. Git may reject a partial or foreign-owned checkout.
+const readWorktreeConfigs = `
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const rootDir = process.argv[1];
+  function read(file) {
+    try { return fs.readFileSync(file, 'utf8'); } catch { return ''; }
+  }
+  const pointer = /^gitdir:\\s*(.+)$/im.exec(read(path.join(rootDir, '.git')));
+  if (!pointer) process.exit(0);
+  const gitDir = path.resolve(rootDir, pointer[1].trim());
+  const localConfig = read(path.join(gitDir, 'config'));
+  const commonDir = read(path.join(gitDir, 'commondir')).trim();
+  const commonConfig = commonDir ? read(path.resolve(gitDir, commonDir, 'config')) : '';
+  process.stdout.write(JSON.stringify([localConfig, commonConfig]));
+`;
+
+function configProductId(config: string): ProductId | undefined {
+  const { origin, upstream } = parseGitConfigRemoteUrls(config);
+  return productIdFromRepositoryRef(origin) ?? productIdFromRepositoryRef(upstream);
+}
+
 function worktreeProductId(rootDir: string, proc: NodeProcessLike): ProductId | undefined {
   const child = proc.getBuiltinModule?.('node:child_process') as typeof import('node:child_process') | undefined;
+  if (!child || !proc.execPath) return undefined;
   try {
-    // A host can start a worktree whose common Git directory is outside its
-    // sandbox. Read that metadata in a bounded child so MCP startup can continue.
-    const config = child?.execFileSync('git', ['config', '--local', '--no-includes', '--get-regexp', '^remote\\.(origin|upstream)\\.url$'], {
-      cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 500, killSignal: 'SIGKILL', windowsHide: true,
+    // Keep potentially blocked reads of external metadata out of the startup process.
+    const configs = child.execFileSync(proc.execPath, ['--input-type=commonjs', '-e', readWorktreeConfigs, '--', rootDir], {
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 500, killSignal: 'SIGKILL', windowsHide: true,
     });
-    const remote = (key: 'origin' | 'upstream') => {
-      const prefix = 'remote.' + key + '.url ';
-      return config?.split(/\r?\n/).find(line => line.startsWith(prefix))?.slice(prefix.length);
-    };
-    return productIdFromRepositoryRef(remote('origin')) ?? productIdFromRepositoryRef(remote('upstream'));
-  } catch {
-    return undefined;
-  }
+    if (configs) {
+      const [local, common] = JSON.parse(configs) as [string, string];
+      return configProductId(local) ?? configProductId(common);
+    }
+  } catch { /* Source metadata is optional. */ }
+  return undefined;
 }
 
 function gitProductId(rootDir: string, { proc, fs, path }: NonNullable<ReturnType<typeof readNodeBuiltins>>): ProductId | undefined {
@@ -107,9 +128,7 @@ function gitProductId(rootDir: string, { proc, fs, path }: NonNullable<ReturnTyp
     const info = fs.statSync(gitEntry);
     if (info.isFile()) return worktreeProductId(rootDir, proc);
     if (info.isDirectory()) {
-      const config = fs.readFileSync(path.join(gitEntry, 'config'), 'utf8');
-      const { origin, upstream } = parseGitConfigRemoteUrls(config);
-      return productIdFromRepositoryRef(origin) ?? productIdFromRepositoryRef(upstream);
+      return configProductId(fs.readFileSync(path.join(gitEntry, 'config'), 'utf8'));
     }
   } catch { /* Source metadata is optional. */ }
   return undefined;

@@ -34,6 +34,19 @@ async function fixture(run: (service: GameProjects, workspace: string) => Promis
   finally { await rm(dir,{recursive:true,force:true}); }
 }
 
+test('read_file MCP input accepts exactly one game selector', () => {
+  const schema = gameTools.find(tool => tool.name === 'openmotion_game_read_file')!.inputSchema;
+  const path = 'index.html';
+  const byId = normalizeToolInput(schema, { id: '  tidebreaker  ', path });
+  assert.deepEqual(byId, { id: 'tidebreaker', path });
+  validateInput(schema, byId);
+  validateInput(schema, normalizeToolInput(schema, { title: 'Tidebreaker', path }));
+  for (const input of [{ id: 'tidebreaker', title: 'Tidebreaker', path }, { path }]) {
+    assert.throws(() => validateInput(schema, normalizeToolInput(schema, input)),
+      /required fields \[id, path\] or \[title, path\]/);
+  }
+});
+
 test('one read_file call accepts an exact displayed or localized game title', () => fixture(async (service, workspace) => {
   const { game } = await service.create(brief);
   await service.updateMeta(game.id, { title: 'Space Racer', i18n: { 'zh-CN': { title: '太空赛车' } } });

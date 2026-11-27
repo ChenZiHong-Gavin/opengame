@@ -11,8 +11,23 @@ import { cleanBillingUrl, decodeMonetizationShortlink } from '../shared/product-
 import { saveTrackingPreference } from '../shared/tracking.ts';
 import { uuid } from '../tracking/core.ts';
 
+async function withTelemetryEnvUnlocked<T>(fn: () => Promise<T>): Promise<T> {
+  const prevTelemetry = process.env.OPENMOTION_TELEMETRY;
+  const prevDnt = process.env.DO_NOT_TRACK;
+  delete process.env.OPENMOTION_TELEMETRY;
+  delete process.env.DO_NOT_TRACK;
+  try {
+    return await fn();
+  } finally {
+    if (prevTelemetry === undefined) delete process.env.OPENMOTION_TELEMETRY;
+    else process.env.OPENMOTION_TELEMETRY = prevTelemetry;
+    if (prevDnt === undefined) delete process.env.DO_NOT_TRACK;
+    else process.env.DO_NOT_TRACK = prevDnt;
+  }
+}
+
 for (const plan of ['free', 'go'] as const) {
-  test(`${plan} inspect returns an attributed shortlink without account intents or opening a browser`, t => fixture(async store => {
+  test(`${plan} inspect returns an attributed shortlink without account intents or opening a browser`, t => withTelemetryEnvUnlocked(() => fixture(async store => {
     const gateway = gatewayFor(store);
     gateway.options.detect = async () => [];
     t.after(() => gateway.close());
@@ -86,7 +101,7 @@ for (const plan of ['free', 'go'] as const) {
     assert.notEqual(next.upgrade.entryId, result.upgrade.entryId);
     checkAttribution(next.upgrade.url, next.upgrade.entryId);
     assert.equal(fetcher.mock.callCount(), 0);
-  }));
+  })));
 }
 
 test('included, signed-out, rejected-key and usable alternative routes do not generate upgrade links', t => fixture(async store => {
@@ -115,7 +130,7 @@ test('included, signed-out, rejected-key and usable alternative routes do not ge
   assert.equal(open.mock.callCount(), 0);
 }));
 
-test('upgrade URL exceptions preserve the settings handoff without returning upgrade', t => fixture(async store => {
+test('upgrade URL exceptions preserve the settings handoff without returning upgrade', t => withTelemetryEnvUnlocked(() => fixture(async store => {
   const gateway = gatewayFor(store);
   gateway.options.detect = async () => [];
   t.after(() => gateway.close());
@@ -132,9 +147,9 @@ test('upgrade URL exceptions preserve the settings handoff without returning upg
     modality: 'all',
   });
   assert.doesNotMatch(JSON.stringify(result), /private-account-error/);
-}));
+})));
 
-test('opted-out telemetry returns clean billing URLs without /t/ shortlinks or _upgradeLinkResult', t => fixture(async store => {
+test('opted-out telemetry returns clean billing URLs without /t/ shortlinks or _upgradeLinkResult', t => withTelemetryEnvUnlocked(() => fixture(async store => {
   resetBalanceLowRecords();
   const gateway = gatewayFor(store);
   gateway.options.detect = async () => [];
@@ -157,9 +172,9 @@ test('opted-out telemetry returns clean billing URLs without /t/ shortlinks or _
     if (prevEnv === undefined) delete process.env.OPENMOTION_TELEMETRY;
     else process.env.OPENMOTION_TELEMETRY = prevEnv;
   }
-}));
+})));
 
-test('BALANCE_LOW job status deduplicates _upgradeLinkResult per job.id across polls and excludes gui calls', t => fixture(async store => {
+test('BALANCE_LOW job status deduplicates _upgradeLinkResult per job.id across polls and excludes gui calls', t => withTelemetryEnvUnlocked(() => fixture(async store => {
   resetBalanceLowRecords();
   const gateway = gatewayFor(store);
   t.after(() => gateway.close());
@@ -248,4 +263,4 @@ test('BALANCE_LOW job status deduplicates _upgradeLinkResult per job.id across p
   const optedOut = await mediaUse(store, { action: 'status', projectId, jobId: motionJob.id }, undefined, host, { channel: 'mcp', mcpChannel: 'mcp_http' });
   assert.equal(optedOut.topup?.url, cleanBillingUrl('r'));
   assert.equal(Object.hasOwn(optedOut, '_upgradeLinkResult'), false);
-}));
+})));

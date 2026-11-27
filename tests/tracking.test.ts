@@ -28,6 +28,21 @@ function packet(): PendingEvent {
 const core = (send: Parameters<typeof createTracker>[0]['send'], maxQueue = 64) =>
   createTracker({ registry: omEvents, entrypoint: 'mcp', enabled: true, flushIntervalMs: 0, maxQueue, send });
 
+async function withTelemetryEnvUnlocked<T>(fn: () => Promise<T>): Promise<T> {
+  const prevTelemetry = process.env.OPENMOTION_TELEMETRY;
+  const prevDnt = process.env.DO_NOT_TRACK;
+  delete process.env.OPENMOTION_TELEMETRY;
+  delete process.env.DO_NOT_TRACK;
+  try {
+    return await fn();
+  } finally {
+    if (prevTelemetry === undefined) delete process.env.OPENMOTION_TELEMETRY;
+    else process.env.OPENMOTION_TELEMETRY = prevTelemetry;
+    if (prevDnt === undefined) delete process.env.DO_NOT_TRACK;
+    else process.env.DO_NOT_TRACK = prevDnt;
+  }
+}
+
 test('Studio event types reject Node-only events and invalid semantic fields', () => {
   execFileSync(process.execPath, [path.join(pluginRoot, 'node_modules/typescript/bin/tsc'),
     '--noEmit', '--strict', '--allowImportingTsExtensions', '--module', 'ESNext', '--moduleResolution', 'Bundler',
@@ -639,7 +654,7 @@ test('provider setup handoff tracks MCP entries exclusively without counting Web
   }
 }));
 
-test('upgrade links track one result per stdio and HTTP MCP inspect, excluding WebMCP calls', t => fixture(async store => {
+test('upgrade links track one result per stdio and HTTP MCP inspect, excluding WebMCP calls', t => withTelemetryEnvUnlocked(() => fixture(async store => {
   const { rpc } = await import('../mcp.ts');
   const { gatewayFor } = await import('../gateway/service.ts');
   const { decodeMonetizationShortlink } = await import('../shared/product-identity.ts');
@@ -789,10 +804,10 @@ test('upgrade links track one result per stdio and HTTP MCP inspect, excluding W
     await gateway.close();
     tracking.close();
   }
-}));
+})));
 
 for (const plan of ['free', 'go'] as const) {
-  test(`${plan} provider discovery strips upgrade metadata on every transport and tracks once per MCP call`, t => fixture(async store => {
+  test(`${plan} provider discovery strips upgrade metadata on every transport and tracks once per MCP call`, t => withTelemetryEnvUnlocked(() => fixture(async store => {
     const { rpc } = await import('../mcp.ts');
     const { gatewayFor } = await import('../gateway/service.ts');
     const { buildOpenMotionWebMcpTools } = await import('../shared/webmcp-tools.ts');
@@ -867,7 +882,7 @@ for (const plan of ['free', 'go'] as const) {
       await gateway.close();
       tracking.close();
     }
-  }));
+  })));
 }
 
 test('template handoff admits observed results and rejects content, made-up outcomes and invalid identities', () => {

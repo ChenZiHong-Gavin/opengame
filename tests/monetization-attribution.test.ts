@@ -31,6 +31,21 @@ function coreTracker(send: (batch: PendingEvent[]) => Promise<'accepted'>) {
   return createTracker({ registry: omEvents, entrypoint: 'mcp', enabled: true, flushIntervalMs: 0, send });
 }
 
+async function withTelemetryEnvUnlocked<T>(fn: () => Promise<T>): Promise<T> {
+  const prevTelemetry = process.env.OPENMOTION_TELEMETRY;
+  const prevDnt = process.env.DO_NOT_TRACK;
+  delete process.env.OPENMOTION_TELEMETRY;
+  delete process.env.DO_NOT_TRACK;
+  try {
+    return await fn();
+  } finally {
+    if (prevTelemetry === undefined) delete process.env.OPENMOTION_TELEMETRY;
+    else process.env.OPENMOTION_TELEMETRY = prevTelemetry;
+    if (prevDnt === undefined) delete process.env.DO_NOT_TRACK;
+    else process.env.DO_NOT_TRACK = prevDnt;
+  }
+}
+
 test('buildPlacementId sanitizes segments, collapses underscores, enforces length caps, and applies defaults', () => {
   assert.equal(buildPlacementId(), 'unknown__unknown__unknown__all');
   assert.equal(buildPlacementId('', null, undefined, ''), 'unknown__unknown__unknown__all');
@@ -180,7 +195,7 @@ test('posthogCommonProperties keeps product=openmotion, adds source_product=open
   }
 });
 
-test('HTTP MCP BALANCE_LOW status deduplicates per job.id while direct WebMCP calls do not consume the slot', t => fixture(async store => {
+test('HTTP MCP BALANCE_LOW status deduplicates per job.id while direct WebMCP calls do not consume the slot', t => withTelemetryEnvUnlocked(() => fixture(async store => {
   resetBalanceLowRecords();
   const events: PendingEvent[] = [];
   const tracking = coreTracker(async batch => { events.push(...batch); return 'accepted'; });
@@ -265,7 +280,7 @@ test('HTTP MCP BALANCE_LOW status deduplicates per job.id while direct WebMCP ca
     await gateway.close();
     tracking.close();
   }
-}));
+})));
 
 test('previewTrackingContext preserves /settings/providers tracking_context and Settings login emits full account_sign_in_result with host_agent', t => fixture(async store => {
   await chmod(accountFixtureBinary, 0o755);

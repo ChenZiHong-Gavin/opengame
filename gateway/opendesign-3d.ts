@@ -13,6 +13,20 @@ import { ProviderError, publicProviderFetch, retryRead, withErrorMeta, type Fetc
 import type { MediaGenerationMode, MediaGenerationPipelineStep } from '../tracking/tool-fields.ts';
 import { cloud3dModels, cloudSpatialCatalog, cloudWorldModels, mediaSubmitHeaders, productionApi, type Cloud3dModelEntry } from './opendesign.ts';
 import { gatewayFor } from './service.ts';
+import {
+  DEFAULT_MESHY_MODEL,
+  MESHY_PROVIDER,
+  meshyGlbUrl,
+  meshyMeshParameters,
+  meshyModels,
+  meshyTextureParameters,
+  readMeshyEnvConfig,
+  resolveMeshyActionIds,
+  submitAndWaitMeshyTask,
+  type MeshyClient,
+  type MeshyTask,
+  type MeshyTaskKind,
+} from './meshy-3d.ts';
 
 const DEFAULT_TRIPO_MODEL = 'tripo-3.0';
 const DEFAULT_WORLD_MODEL = 'worldlabs-atlas';
@@ -37,7 +51,7 @@ const MIME_BY_EXT: Record<string, string> = {
   '.webp': 'image/webp',
 };
 
-type SpatialProvider = 'account' | 'opendesign' | 'env';
+type SpatialProvider = 'account' | 'opendesign' | 'env' | 'meshy';
 
 type SpatialTelemetryHooks = {
   report: (stage: CapabilityScriptStage, meta?: CapabilityScriptTelemetryMeta) => void;
@@ -84,6 +98,8 @@ export type OpenDesign3dDiscovery = {
 type SpatialCheckpoint = {
   inputFingerprint?: string;
   uploadAssetIds?: string[];
+  /** Meshy Text to 3D preview task, refined into `baseTaskId`. */
+  previewTaskId?: string;
   baseTaskId?: string;
   rigTaskId?: string;
   retargetTaskId?: string;
@@ -181,6 +197,15 @@ async function resolveSpatialEndpoint(
   }
   if (requestedProvider === 'env') return null;
 
+  // A Meshy key in the environment is explicit user configuration, like the Tripo env key above.
+  if (domain === '3d' && (!requestedProvider || requestedProvider === MESHY_PROVIDER)) {
+    const meshy = readMeshyEnvConfig();
+    if (meshy) {
+      return { provider: 'meshy', baseUrl: meshy.baseUrl, apiKey: meshy.apiKey, taskTimeoutMs: meshy.taskTimeoutMs, models: meshyModels };
+    }
+  }
+  if (requestedProvider === MESHY_PROVIDER) return null;
+
   const cache = domain === 'world' ? worldDiscoveryCache : discoveryCache;
   const cacheKey = `${(store.workspaceStore ?? store).directory}::${requestedProvider ?? '*'}`;
   const cached = !refresh ? cache.get(cacheKey) : undefined;
@@ -260,7 +285,8 @@ export async function discoverOpenDesignSpatial(
   store: WorkspaceStore,
   refresh = false,
 ): Promise<{ live3d: OpenDesign3dDiscovery; liveWorld: OpenDesign3dDiscovery }> {
-  const env3d = readEnvConfig('OPENMOTION_TRIPO_ENABLED', 'OPENMOTION_TRIPO_API_KEY', 'OPENMOTION_TRIPO_KEY_FILE', 'OPENMOTION_TRIPO_BASE_URL');
+  const env3d = readEnvConfig('OPENMOTION_TRIPO_ENABLED', 'OPENMOTION_TRIPO_API_KEY', 'OPENMOTION_TRIPO_KEY_FILE', 'OPENMOTION_TRIPO_BASE_URL')
+    ?? readMeshyEnvConfig();
   const envWorld = readEnvConfig('OPENMOTION_WORLD_ENABLED', 'OPENMOTION_WORLD_API_KEY', 'OPENMOTION_WORLD_KEY_FILE', 'OPENMOTION_WORLD_BASE_URL');
   const cacheKey = `${(store.workspaceStore ?? store).directory}::*`;
   const now = Date.now();
@@ -846,7 +872,7 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
     throw new Error(
       requested.provider
         ? `CAPABILITY_UNAVAILABLE: Provider ${requested.provider} has no active 3D generation model`
-        : 'CAPABILITY_UNAVAILABLE: No active 3D generation model (tripo-3.0) is available on the signed-in OpenDesign account or configured OpenDesign Cloud connection.',
+        : 'CAPABILITY_UNAVAILABLE: No active 3D generation model is available: sign in to OpenDesign, configure an OpenDesign Cloud connection, or set MESHY_API_KEY.',
     );
   }
   if (requested.modelId && !resolvedConfig.models.some(m => m.modelId === requested.modelId)) {
@@ -855,8 +881,9 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
   const gateway = gatewayFor(ctx.store);
   const fetcher = resolveFetcher(ctx.store);
   const pollMs = gateway.options.pollMs ?? POLL_INTERVAL_MS;
+  const isMeshy = resolvedConfig.provider === MESHY_PROVIDER;
   const modelId = requested.modelId
-    ?? resolvedConfig.models.find(m => m.modelId === DEFAULT_TRIPO_MODEL)?.modelId
+    ?? resolvedConfig.models.find(m => m.modelId === (isMeshy ? DEFAULT_MESHY_MODEL : DEFAULT_TRIPO_MODEL))?.modelId
     ?? resolvedConfig.models[0]?.modelId
     ?? DEFAULT_TRIPO_MODEL;
   const accountPlan = resolvedConfig.provider === 'account'
@@ -905,12 +932,17 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
   const rawAnimationsList = Array.isArray(params.animations)
     ? params.animations.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
     : [];
-  const animationsList = (rawAnimationsList.length > 0 ? rawAnimationsList : rigPresetAnimations).map(normalizeTripoAnimation);
+  // Meshy resolves names against its own animation library, so only Tripo needs `preset:*` normalization.
+  const normalizeAnimation = isMeshy ? (value: string) => value.trim() : normalizeTripoAnimation;
+  const animationsList = (rawAnimationsList.length > 0 ? rawAnimationsList : rigPresetAnimations).map(normalizeAnimation);
   const rawAnimation = (typeof params.animation === 'string' && params.animation.trim())
     || rigPresetAnimation
     || (typeof ctx.options.animation === 'string' && ctx.options.animation !== 'none' ? ctx.options.animation : undefined);
-  const animation = rawAnimation ? normalizeTripoAnimation(rawAnimation) : undefined;
-  const hasRetargetAnimation = Boolean(animation || animationsList.length > 0);
+  const animation = rawAnimation ? normalizeAnimation(rawAnimation) : undefined;
+  const meshyActionIds = isMeshy && Array.isArray(params.action_ids)
+    ? params.action_ids.map(Number).filter(id => Number.isInteger(id) && id >= 0)
+    : [];
+  const hasRetargetAnimation = Boolean(animation || animationsList.length > 0 || meshyActionIds.length > 0);
 
   let effectiveOp = explicitParamOp ?? optionOp;
   if (effectiveOp === 'auto') {
@@ -972,8 +1004,29 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
   let rigTaskId = checkpoint.rigTaskId;
   let retargetRan = false;
   let finalTask: TripoTaskResult;
+  let meshyAnimationLabels: string[] = [];
 
-  if (effectiveOp === 'text_to_model') {
+  if (isMeshy) {
+    const meshyRun = await runMeshyOperation({
+      ctx,
+      config,
+      fetcher,
+      pollMs,
+      modelId,
+      operation: effectiveOp,
+      params,
+      faceLimit,
+      checkpoint,
+      checkpointPath,
+      originalTaskId: originalTaskIdParam,
+      animationRequests: meshyActionIds.length > 0 ? meshyActionIds : animationsList.length > 0 ? animationsList : animation ? [animation] : [],
+    });
+    finalTask = meshyRun.finalTask;
+    baseTaskId = meshyRun.baseTaskId ?? baseTaskId;
+    rigTaskId = meshyRun.rigTaskId ?? rigTaskId;
+    retargetRan = meshyRun.retargetRan;
+    meshyAnimationLabels = meshyRun.animationLabels;
+  } else if (effectiveOp === 'text_to_model') {
     if (ctx.references.length > 0) {
       throw new Error('3d-asset text_to_model does not accept reference images (use image_to_model for 1 image or multiview_to_model for 2–4 images)');
     }
@@ -1200,6 +1253,7 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
         ...(rigTaskId ? { rigTaskId } : {}),
         ...(retargetRan && animation ? { animation } : {}),
         ...(retargetRan && animationsList.length > 0 ? { requestedAnimations: animationsList } : {}),
+        ...(retargetRan && meshyAnimationLabels.length > 0 ? { meshyAnimations: meshyAnimationLabels } : {}),
         faceLimit,
         rawBytes,
         bytes: finalGlb.bytes,
@@ -1217,6 +1271,176 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
     throw error;
   }
+}
+
+const MESHY_OPERATIONS = new Set(['text_to_model', 'image_to_model', 'multiview_to_model', 'rig', 'rig_retarget', 'retarget']);
+
+async function meshyReferenceDataUri(filePath: string): Promise<string> {
+  const { bytes, contentType } = await prepareUploadReferenceBytes(filePath);
+  return `data:${contentType};base64,${bytes.toString('base64')}`;
+}
+
+/**
+ * Run a `3d-asset` operation against the native Meshy API. Every submitted task id is written to the
+ * request checkpoint before polling, so resuming the same requestId continues the original paid tasks
+ * instead of submitting new ones (Meshy has no idempotency header).
+ */
+async function runMeshyOperation(input: {
+  ctx: CapabilityScriptContext;
+  config: Resolved3dEndpoint;
+  fetcher: Fetcher;
+  pollMs: number;
+  modelId: string;
+  operation: string;
+  params: Record<string, unknown>;
+  faceLimit: number;
+  checkpoint: SpatialCheckpoint;
+  checkpointPath: string;
+  originalTaskId?: string;
+  animationRequests: readonly (string | number)[];
+}): Promise<{ finalTask: TripoTaskResult; baseTaskId?: string; rigTaskId?: string; retargetRan: boolean; animationLabels: string[] }> {
+  const { ctx, config, params, checkpoint, checkpointPath, operation } = input;
+  if (!MESHY_OPERATIONS.has(operation)) {
+    throw new Error(`Unsupported 3d-asset operation for Meshy: ${operation} (Meshy supports ${[...MESHY_OPERATIONS].join(', ')})`);
+  }
+  const client: MeshyClient = {
+    fetcher: input.fetcher,
+    baseUrl: config.baseUrl,
+    apiKey: config.apiKey,
+    taskTimeoutMs: config.taskTimeoutMs,
+    pollMs: input.pollMs,
+    report: config.telemetry?.report,
+  };
+  const persist = (field: 'previewTaskId' | 'baseTaskId' | 'rigTaskId' | 'retargetTaskId') => async (taskId: string) => {
+    checkpoint[field] = taskId;
+    await saveCheckpoint(checkpointPath, checkpoint);
+  };
+  const toResult = (task: MeshyTask, kind: MeshyTaskKind): TripoTaskResult => ({
+    taskId: task.id,
+    status: 'succeeded',
+    artifacts: [{ name: 'model', format: 'glb', url: meshyGlbUrl(task, kind) }],
+    raw: task,
+  });
+  const prompt = ctx.prompt.trim();
+  const refs = ctx.references;
+  const mesh = meshyMeshParameters(params, input.faceLimit);
+  const shouldTexture = params.texture !== false;
+  const texture = shouldTexture ? meshyTextureParameters(params) : {};
+
+  const generateBase = async (): Promise<{ task: MeshyTask; kind: MeshyTaskKind }> => {
+    if (refs.length === 0) {
+      if (!prompt) throw new Error('3d-asset text_to_model requires a non-empty prompt');
+      const preview = await submitAndWaitMeshyTask(client, 'text-to-3d', {
+        mode: 'preview',
+        prompt,
+        ai_model: input.modelId,
+        ...mesh,
+      }, {
+        existingTaskId: checkpoint.previewTaskId,
+        onSubmitted: persist('previewTaskId'),
+        telemetry: { pipelineStep: 'base', mode: 'text-to-3d' },
+      });
+      if (!shouldTexture) return { task: preview, kind: 'text-to-3d' };
+      const refined = await submitAndWaitMeshyTask(client, 'text-to-3d', {
+        mode: 'refine',
+        preview_task_id: preview.id,
+        ...texture,
+        target_formats: ['glb'],
+      }, {
+        existingTaskId: checkpoint.baseTaskId,
+        onSubmitted: persist('baseTaskId'),
+        telemetry: { pipelineStep: 'base', mode: 'text-to-3d' },
+      });
+      return { task: refined, kind: 'text-to-3d' };
+    }
+    if (refs.length > 4) throw new Error('Meshy accepts at most 4 reference images (multi-image to 3D)');
+    const images = await Promise.all(refs.map(ref => meshyReferenceDataUri(ref.filename)));
+    const kind: MeshyTaskKind = images.length === 1 ? 'image-to-3d' : 'multi-image-to-3d';
+    const task = await submitAndWaitMeshyTask(client, kind, {
+      ...(images.length === 1 ? { image_url: images[0] } : { image_urls: images }),
+      ai_model: input.modelId,
+      should_texture: shouldTexture,
+      ...texture,
+      ...mesh,
+    }, {
+      existingTaskId: checkpoint.baseTaskId,
+      onSubmitted: persist('baseTaskId'),
+      telemetry: { pipelineStep: 'base', mode: 'image-to-3d' },
+    });
+    return { task, kind };
+  };
+
+  if (operation === 'text_to_model' || operation === 'image_to_model' || operation === 'multiview_to_model') {
+    if (operation === 'text_to_model' && refs.length > 0) {
+      throw new Error('3d-asset text_to_model does not accept reference images (use image_to_model for 1 image or multiview_to_model for 2–4 images)');
+    }
+    if (operation === 'image_to_model' && refs.length !== 1) {
+      throw new Error('3d-asset image_to_model requires exactly 1 reference image asset');
+    }
+    if (operation === 'multiview_to_model' && (refs.length < 2 || refs.length > 4)) {
+      throw new Error('3d-asset operation=multiview_to_model requires 2–4 reference image assets');
+    }
+    const { task, kind } = await generateBase();
+    return { finalTask: toResult(task, kind), baseTaskId: task.id, retargetRan: false, animationLabels: [] };
+  }
+
+  const rigType = params.rig_type === 'quadruped' ? 'quadruped' : 'biped';
+  const animate = async (rigTaskId: string) => {
+    const { actionIds, labels } = await resolveMeshyActionIds(client, input.animationRequests, rigType);
+    if (actionIds.length === 0) {
+      throw new Error('3d-asset Meshy animation requires at least one animation (options.rigPreset, parameters.animation(s), or parameters.action_ids)');
+    }
+    const task = await submitAndWaitMeshyTask(client, 'animations', {
+      rig_task_id: rigTaskId,
+      ...(actionIds.length === 1 ? { action_id: actionIds[0] } : { action_ids: actionIds }),
+    }, {
+      existingTaskId: checkpoint.retargetTaskId,
+      onSubmitted: persist('retargetTaskId'),
+      telemetry: { pipelineStep: 'retarget', mode: 'retarget-3d' },
+    });
+    return { task, labels };
+  };
+
+  if (operation === 'retarget') {
+    if (!input.originalTaskId) {
+      throw new Error('3d-asset operation=retarget requires parameters.original_model_task_id (a prior Meshy rigTaskId)');
+    }
+    if (refs.length > 0) {
+      throw new Error('3d-asset operation=retarget operates on parameters.original_model_task_id and does not accept reference images');
+    }
+    const { task, labels } = await animate(input.originalTaskId);
+    return { finalTask: toResult(task, 'animations'), rigTaskId: input.originalTaskId, retargetRan: true, animationLabels: labels };
+  }
+
+  // rig / rig_retarget: base mesh (reused, resumed or generated) → Meshy rigging → optional animation clips.
+  if (input.originalTaskId && refs.length > 0) {
+    throw new Error(`3d-asset operation=${operation} with parameters.original_model_task_id does not accept reference images`);
+  }
+  let baseTaskId = input.originalTaskId;
+  if (!baseTaskId) {
+    if (refs.length === 0 && !prompt) {
+      throw new Error(`3d-asset ${operation} requires parameters.original_model_task_id, a prompt, or 1–4 reference images`);
+    }
+    baseTaskId = (await generateBase()).task.id;
+  }
+  const height = Number(params.height_meters);
+  const rigTask = await submitAndWaitMeshyTask(client, 'rigging', {
+    input_task_id: baseTaskId,
+    animation_type: rigType,
+    // Default to the Mixamo skeleton so bone names match vendor/HumanoidRigController.js and the game skill.
+    ...(rigType === 'biped' ? { skeleton_template: typeof params.skeleton_template === 'string' && params.skeleton_template.trim() ? params.skeleton_template.trim() : 'mixamo' } : {}),
+    ...(Number.isFinite(height) && height > 0 ? { height_meters: height } : {}),
+    ...(params.include_fingers !== undefined ? { include_fingers: Boolean(params.include_fingers) } : {}),
+  }, {
+    existingTaskId: checkpoint.rigTaskId,
+    onSubmitted: persist('rigTaskId'),
+    telemetry: { pipelineStep: 'rig', mode: 'rig-3d' },
+  });
+  if (operation === 'rig') {
+    return { finalTask: toResult(rigTask, 'rigging'), baseTaskId, rigTaskId: rigTask.id, retargetRan: false, animationLabels: [] };
+  }
+  const { task, labels } = await animate(rigTask.id);
+  return { finalTask: toResult(task, 'animations'), baseTaskId, rigTaskId: rigTask.id, retargetRan: true, animationLabels: labels };
 }
 
 function isGlbArtifactDescriptor(artifact: TripoArtifact): boolean {

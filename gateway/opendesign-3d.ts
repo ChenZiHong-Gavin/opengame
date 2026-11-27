@@ -941,7 +941,12 @@ export async function runOpenDesign3dScript(ctx: CapabilityScriptContext): Promi
     || (typeof ctx.options.animation === 'string' && ctx.options.animation !== 'none' ? ctx.options.animation : undefined);
   const animation = rawAnimation ? normalizeAnimation(rawAnimation) : undefined;
   const meshyActionIds = isMeshy && Array.isArray(params.action_ids)
-    ? params.action_ids.map(Number).filter(id => Number.isInteger(id) && id >= 0)
+    ? params.action_ids.flatMap(entry => {
+      // Only real numbers or all-digit strings: Number(null | '' | false | []) is 0 and would silently request action 0.
+      if (typeof entry === 'number') return Number.isInteger(entry) && entry >= 0 ? [entry] : [];
+      if (typeof entry === 'string' && /^\d+$/.test(entry.trim())) return [Number(entry.trim())];
+      return [];
+    })
     : [];
   const hasRetargetAnimation = Boolean(animation || animationsList.length > 0 || meshyActionIds.length > 0);
 
@@ -1421,6 +1426,10 @@ async function runMeshyOperation(input: {
   if (!baseTaskId) {
     if (refs.length === 0 && !prompt) {
       throw new Error(`3d-asset ${operation} requires parameters.original_model_task_id, a prompt, or 1–4 reference images`);
+    }
+    if (!shouldTexture) {
+      // Meshy rigging only accepts textured meshes; fail before paying for a base mesh that rigging would reject.
+      throw new Error(`3d-asset ${operation} on Meshy requires a textured mesh; remove parameters.texture=false`);
     }
     baseTaskId = (await generateBase()).task.id;
   }

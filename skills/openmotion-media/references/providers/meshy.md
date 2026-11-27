@@ -38,7 +38,7 @@ Call `openmotion_capability_run` with `capabilityId: "3d-asset"`. Every operatio
 ## Parameters
 
 - `options.quality` sets `target_polycount` (`prop-low` 5,000, `hero-balanced` 10,000, `hero-high` 18,000) with `should_remesh: true` and triangle topology. `parameters.target_polycount` overrides it (100–300,000).
-- `parameters.pbr` (default `true`) maps to `enable_pbr`; `parameters.texture: false` returns an untextured mesh (skips the Text to 3D refine step; rigging needs a textured mesh).
+- `parameters.pbr` (default `true`) maps to `enable_pbr`; `parameters.texture: false` returns an untextured mesh (skips the Text to 3D refine step). Rigging needs a textured mesh, so `rig` and `rig_retarget` reject `texture: false` before any request when they would generate the base mesh.
 - Forwarded when present: `pose_mode` (`a-pose` or `t-pose`; prefer `a-pose` before rigging), `geometry_resolution`, `decimation_mode`, `moderation`, `auto_size`, `origin_at`, `texture_prompt`, `texture_image_url`, `texture_resolution`, `remove_lighting`.
 - Rigging: `parameters.rig_type` (`biped` default, or `quadruped`), `parameters.skeleton_template` (default `mixamo`, so bone names match `vendor/HumanoidRigController.js`), `parameters.height_meters`, `parameters.include_fingers`.
 - Reference images are sent as data URIs (PNG, JPEG or WebP; large images are re-encoded to JPEG locally).
@@ -49,7 +49,7 @@ Animations come from the [Meshy animation library](https://docs.meshy.ai/en/api/
 
 - `options.rigPreset` presets work unchanged (`mixamo-idle`, `mixamo-walk`, `mixamo-run`, `mixamo-slash`, `mixamo-locomotion`, `mixamo-combat`).
 - `idle`, `walk`, `run`, `slash` and `attack` map to library ids 0, 30, 14, 97 and 4. Other names (`preset:jump`, `hurt`, or a library name such as `Left_Slash`) are looked up with the free `GET /openapi/v1/animations/library?search=` endpoint, taking the first match for the rig type.
-- `parameters.action_ids: [0, 92]` passes exact library ids and takes precedence over names.
+- `parameters.action_ids: [0, 92]` passes exact library ids and takes precedence over names; only integers or all-digit strings count, and blank or non-numeric entries are ignored.
 - The result reports resolved clip names as `meshyAnimations`.
 
 ## Costs, retries and errors

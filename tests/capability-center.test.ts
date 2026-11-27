@@ -1443,8 +1443,13 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
     const api = service(store);
     const gateway = gatewayFor(store);
     const glbBytes = makeTinyGlb();
-    const previousKey = process.env.MESHY_API_KEY;
-    const previousBase = process.env.MESHY_BASE_URL;
+    // Isolate from any ambient 3D provider setup: a Tripo key outranks Meshy and OPENMOTION_MESHY_ENABLED=0 disables it.
+    const isolatedEnvKeys = [
+      'MESHY_API_KEY', 'MESHY_API_KEY_FILE', 'MESHY_BASE_URL', 'MESHY_TASK_TIMEOUT_MS', 'OPENMOTION_MESHY_ENABLED',
+      'OPENMOTION_TRIPO_API_KEY', 'OPENMOTION_TRIPO_KEY_FILE', 'OPENMOTION_TRIPO_ENABLED', 'OPENMOTION_TRIPO_BASE_URL',
+    ] as const;
+    const previousEnv = Object.fromEntries(isolatedEnvKeys.map(key => [key, process.env[key]]));
+    for (const key of isolatedEnvKeys) delete process.env[key];
     process.env.MESHY_API_KEY = 'msy_test_key';
     process.env.MESHY_BASE_URL = 'https://meshy-mock.example.com';
     const submitted: { path: string; body: any }[] = [];
@@ -1620,6 +1625,32 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
       );
       assert.equal(submitted.length, beforeUnsupported);
 
+      // Rigging needs a textured mesh: texture=false with a rig operation fails before any paid base-mesh request.
+      await assert.rejects(
+        api.call('openmotion_capability_run', {
+          action: 'run',
+          requestId: 'meshy-rig-untextured-1',
+          capabilityId: '3d-asset',
+          model: 'meshy:meshy-7.1',
+          prompt: 'Knight in armor',
+          options: { operation: 'rig' },
+          parameters: { texture: false },
+        }),
+        /requires a textured mesh/,
+      );
+      assert.equal(submitted.length, beforeUnsupported);
+
+      // Blank or non-numeric action_ids entries are dropped instead of coercing to action 0.
+      await api.call('openmotion_capability_run', {
+        action: 'run',
+        requestId: 'meshy-retarget-blank-ids-1',
+        capabilityId: '3d-asset',
+        model: 'meshy:meshy-7.1',
+        options: { operation: 'retarget' },
+        parameters: { original_model_task_id: 'rigging-4', action_ids: [null, '', false, [], ' 92 '], slim: false },
+      });
+      assert.deepEqual(submitted.at(-1), { path: '/openapi/v1/animations', body: { rig_task_id: 'rigging-4', action_id: 92 } });
+
       // A checkpoint holding only the preview task id still guards against changed inputs.
       failNextPreview = true;
       const previewGuardRun = {
@@ -1653,8 +1684,9 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
         /Meshy image-to-3d task image-to-3d-\d+ failed: Image is too complex/,
       );
     } finally {
-      if (previousKey === undefined) delete process.env.MESHY_API_KEY; else process.env.MESHY_API_KEY = previousKey;
-      if (previousBase === undefined) delete process.env.MESHY_BASE_URL; else process.env.MESHY_BASE_URL = previousBase;
+      for (const key of isolatedEnvKeys) {
+        if (previousEnv[key] === undefined) delete process.env[key]; else process.env[key] = previousEnv[key];
+      }
       clearOpenDesign3dDiscoveryCache();
     }
   }, false));

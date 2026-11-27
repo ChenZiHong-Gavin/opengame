@@ -6,7 +6,7 @@
       .bg { fill: #ffffff; }
       .fg { fill: #111111; }
       .axis { fill: none; stroke: #111111; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
-      .legend-bg { fill: rgba(255,255,255,0.92); stroke: #111111; stroke-width: 2; stroke-linecap: round; }
+      .legend-bg { fill: rgba(255,255,255,0.92); }
       .series { fill: none; stroke: #dd4528; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
       .swatch { fill: #dd4528; }
       .muted { fill: #57606a; }
@@ -14,7 +14,7 @@
         .bg { fill: #0d1117; }
         .fg { fill: #e6edf3; }
         .axis { stroke: #e6edf3; }
-        .legend-bg { fill: rgba(13,17,23,0.92); stroke: #e6edf3; }
+        .legend-bg { fill: rgba(13,17,23,0.92); }
         .series { stroke: #ff6b4a; }
         .swatch { fill: #ff6b4a; }
         .muted { fill: #8b949e; }
@@ -22,41 +22,35 @@
     </style>
   </defs>
   <rect class="bg" width="800" height="533" rx="8" />
-  <text x="400" y="42" text-anchor="middle" font-size="24" font-weight="700" class="fg">Star History</text>
+  <g transform="translate(316, 22)">
+    <circle cx="12" cy="12" r="10.5" class="axis" style="stroke-width:2.4" />
+    <path d="M12 6.5 L12 12.5 L16 14.5" class="axis" style="stroke-width:2.2" />
+  </g>
+  <text x="348" y="42" font-size="24" font-weight="700" class="fg">Star History</text>
   <path class="axis" d="M92.0,72.0 L91.1,85.2 L92.9,98.4 L91.6,111.5 L91.6,124.7 L93.0,137.9 L91.2,151.1 L92.2,164.2 L92.6,177.4 L91.0,190.6 L92.7,203.8 L92.1,217.0 L91.2,230.1 L93.0,243.3 L91.5,256.5 L91.7,269.7 L92.9,282.9 L91.1,296.0 L92.3,309.2 L92.5,322.4 L91.0,335.6 L92.8,348.8 L91.9,361.9 L91.3,375.1 L93.0,388.3 L91.3,401.5 L91.9,414.6 L92.8,427.8 L92.0,441.0" />
   <path class="axis" d="M92.0,441.0 L112.6,440.1 L133.2,441.9 L153.9,440.6 L174.5,440.6 L195.1,442.0 L215.8,440.2 L236.4,441.2 L257.0,441.6 L277.6,440.0 L298.2,441.7 L318.9,441.1 L339.5,440.2 L360.1,442.0 L380.8,440.5 L401.4,440.7 L422.0,441.9 L442.6,440.1 L463.2,441.3 L483.9,441.5 L504.5,440.0 L525.1,441.8 L545.8,440.9 L566.4,440.3 L587.0,442.0 L607.6,440.3 L628.2,440.9 L648.9,441.8 L669.5,440.0 L690.1,441.5 L710.8,441.3 L731.4,440.1 L752.0,441.0" />
-  <path class="axis" d="M86.0,388.3 L92.0,388.3" />
-  <text x="80.0" y="393.3" text-anchor="end" font-size="16" class="fg">200</text>
-  <path class="axis" d="M86.0,335.6 L92.0,335.6" />
-  <text x="80.0" y="340.6" text-anchor="end" font-size="16" class="fg">400</text>
-  <path class="axis" d="M86.0,282.9 L92.0,282.9" />
-  <text x="80.0" y="287.9" text-anchor="end" font-size="16" class="fg">600</text>
-  <path class="axis" d="M86.0,230.1 L92.0,230.1" />
-  <text x="80.0" y="235.1" text-anchor="end" font-size="16" class="fg">800</text>
-  <path class="axis" d="M86.0,177.4 L92.0,177.4" />
-  <text x="80.0" y="182.4" text-anchor="end" font-size="16" class="fg">1k</text>
-  <path class="axis" d="M86.0,124.7 L92.0,124.7" />
-  <text x="80.0" y="129.7" text-anchor="end" font-size="16" class="fg">1.2k</text>
-  <path class="axis" d="M86.0,72.0 L92.0,72.0" />
-  <text x="80.0" y="77.0" text-anchor="end" font-size="16" class="fg">1.4k</text>
-  <path class="axis" d="M92.0,441.0 L92.0,447.0" />
-  <text x="92.0" y="467.0" text-anchor="middle" font-size="16" class="fg">Nov 26</text>
-  <path class="axis" d="M224.0,441.0 L224.0,447.0" />
-  <text x="224.0" y="467.0" text-anchor="middle" font-size="16" class="fg">9 AM</text>
-  <path class="axis" d="M356.0,441.0 L356.0,447.0" />
-  <text x="356.0" y="467.0" text-anchor="middle" font-size="16" class="fg">2 PM</text>
-  <path class="axis" d="M488.0,441.0 L488.0,447.0" />
-  <text x="488.0" y="467.0" text-anchor="middle" font-size="16" class="fg">7 PM</text>
-  <path class="axis" d="M620.0,441.0 L620.0,447.0" />
-  <text x="620.0" y="467.0" text-anchor="middle" font-size="16" class="fg">Nov 27</text>
-  <path class="axis" d="M752.0,441.0 L752.0,447.0" />
-  <text x="752.0" y="467.0" text-anchor="middle" font-size="16" class="fg">6 AM</text>
+  <text x="82.0" y="393.3" text-anchor="end" font-size="16" class="fg">200</text>
+  <text x="82.0" y="340.6" text-anchor="end" font-size="16" class="fg">400</text>
+  <text x="82.0" y="287.9" text-anchor="end" font-size="16" class="fg">600</text>
+  <text x="82.0" y="235.1" text-anchor="end" font-size="16" class="fg">800</text>
+  <text x="82.0" y="182.4" text-anchor="end" font-size="16" class="fg">1k</text>
+  <text x="82.0" y="129.7" text-anchor="end" font-size="16" class="fg">1.2k</text>
+  <text x="82.0" y="77.0" text-anchor="end" font-size="16" class="fg">1.4k</text>
+  <text x="92.0" y="465.0" text-anchor="middle" font-size="16" class="fg">Nov 26</text>
+  <text x="224.0" y="465.0" text-anchor="middle" font-size="16" class="fg">9 AM</text>
+  <text x="356.0" y="465.0" text-anchor="middle" font-size="16" class="fg">2 PM</text>
+  <text x="488.0" y="465.0" text-anchor="middle" font-size="16" class="fg">7 PM</text>
+  <text x="620.0" y="465.0" text-anchor="middle" font-size="16" class="fg">Nov 27</text>
+  <text x="752.0" y="465.0" text-anchor="middle" font-size="16" class="fg">6 AM</text>
   <text x="422.0" y="511" text-anchor="middle" font-size="18" class="fg">Date</text>
   <text x="26" y="256.5" text-anchor="middle" font-size="18" class="fg" transform="rotate(-90 26 256.5)">GitHub Stars</text>
-  <path class="series" d="M92.0,441.0 Q92.0,441.0 98.9,441.2 Q105.8,441.4 112.6,440.6 Q119.5,439.9 126.4,439.8 Q133.2,439.7 140.1,440.4 Q147.0,441.2 153.9,440.4 Q160.8,439.6 167.6,439.2 Q174.5,438.8 181.4,439.6 Q188.2,440.4 195.1,440.3 Q202.0,440.2 208.9,439.4 Q215.8,438.7 222.6,439.1 Q229.5,439.6 236.4,439.5 Q243.2,439.5 250.1,435.7 Q257.0,431.8 263.9,426.5 Q270.8,421.1 277.6,417.6 Q284.5,414.1 291.4,408.4 Q298.2,402.8 305.1,393.8 Q312.0,384.8 318.9,380.6 Q325.8,376.4 332.6,368.9 Q339.5,361.5 346.4,356.1 Q353.2,350.6 360.1,345.2 Q367.0,339.8 373.9,334.8 Q380.8,329.8 387.6,324.1 Q394.5,318.4 401.4,312.2 Q408.2,306.0 415.1,300.1 Q422.0,294.1 428.9,288.6 Q435.8,283.0 442.6,279.7 Q449.5,276.3 456.4,273.5 Q463.2,270.8 470.1,268.1 Q477.0,265.4 483.9,262.6 Q490.8,259.7 497.6,258.9 Q504.5,258.0 511.4,257.2 Q518.2,256.4 525.1,254.2 Q532.0,251.9 538.9,250.3 Q545.8,248.7 552.6,247.2 Q559.5,245.6 566.4,242.2 Q573.2,238.9 580.1,234.7 Q587.0,230.5 593.9,227.5 Q600.8,224.5 607.6,219.7 Q614.5,214.9 621.4,206.6 Q628.2,198.3 635.1,191.3 Q642.0,184.3 648.9,175.9 Q655.8,167.5 662.6,159.6 Q669.5,151.7 676.4,144.7 Q683.2,137.6 690.1,130.5 Q697.0,123.3 703.9,117.1 Q710.8,110.9 717.6,105.8 Q724.5,100.7 731.4,96.7 Q738.2,92.7 745.1,87.2 L752.0,81.8" />
-  <rect x="110" y="86" width="185" height="36" rx="4" class="legend-bg" stroke="none" />
-  <path class="axis" style="stroke-width:2" d="M110.0,86.0 L125.4,86.5 L140.8,86.1 L156.2,85.4 L171.7,86.7 L187.1,85.7 L202.5,85.8 L217.9,86.6 L233.3,85.4 L248.8,86.2 L264.2,86.4 L279.6,85.3 L295.0,86.0 M295.0,86.0 L295.3,92.0 L295.3,98.0 L294.3,104.0 L295.6,110.0 L294.9,116.0 L295.0,122.0 M295.0,122.0 L279.6,122.3 L264.2,122.3 L248.8,121.3 L233.3,122.6 L217.9,121.9 L202.5,121.6 L187.1,122.7 L171.7,121.5 L156.2,122.0 L140.8,122.6 L125.4,121.3 L110.0,122.0 M110.0,122.0 L110.5,116.0 L110.1,110.0 L109.4,104.0 L110.7,98.0 L109.7,92.0 L110.0,86.0" />
-  <rect x="122" y="98" width="11" height="11" rx="2" class="swatch" />
-  <text x="141" y="109" font-size="16" class="fg">nexu-io/opengame</text>
-  <text x="752" y="495" text-anchor="end" font-size="14" class="muted">★ 1,363 · updated 2026-11-27</text>
+  <path class="series" d="M92.0,441.0 Q92.0,441.0 97.9,441.2 Q103.8,441.3 109.7,440.6 Q115.6,439.9 121.5,439.8 Q127.4,439.7 133.2,440.4 Q139.1,441.1 145.0,440.6 Q150.9,440.1 156.8,439.5 Q162.7,438.9 168.6,439.6 Q174.5,440.3 180.4,440.2 Q186.3,440.1 192.2,439.5 Q198.1,438.8 204.0,439.3 Q209.9,439.8 215.8,440.0 Q221.6,440.2 227.5,439.5 Q233.4,438.8 239.3,438.4 Q245.2,438.0 251.1,435.5 Q257.0,432.9 262.9,427.4 Q268.8,421.8 274.7,417.6 Q280.6,413.4 286.5,410.3 Q292.4,407.2 298.2,399.7 Q304.1,392.3 310.0,386.1 Q315.9,380.0 321.8,376.5 Q327.7,373.0 333.6,367.0 Q339.5,361.1 345.4,356.0 Q351.3,350.9 357.2,345.9 Q363.1,340.9 369.0,337.3 Q374.9,333.8 380.8,328.5 Q386.6,323.1 392.5,317.9 Q398.4,312.7 404.3,307.0 Q410.2,301.3 416.1,296.0 Q422.0,290.7 427.9,286.5 Q433.8,282.2 439.7,279.8 Q445.6,277.5 451.5,274.7 Q457.4,271.9 463.2,268.8 Q469.1,265.7 475.0,264.1 Q480.9,262.4 486.8,261.2 Q492.7,260.0 498.6,258.3 Q504.5,256.6 510.4,255.6 Q516.3,254.6 522.2,254.2 Q528.1,253.9 534.0,251.8 Q539.9,249.7 545.8,247.3 Q551.6,244.8 557.5,243.7 Q563.4,242.5 569.3,239.9 Q575.2,237.3 581.1,232.5 Q587.0,227.7 592.9,225.4 Q598.8,223.0 604.7,219.4 Q610.6,215.7 616.5,208.7 Q622.4,201.6 628.2,194.6 Q634.1,187.5 640.0,180.9 Q645.9,174.4 651.8,167.8 Q657.7,161.3 663.6,154.3 Q669.5,147.4 675.4,141.5 Q681.3,135.6 687.2,129.1 Q693.1,122.5 699.0,117.5 Q704.9,112.5 710.8,108.5 Q716.6,104.6 722.5,100.1 Q728.4,95.7 734.3,90.8 Q740.2,85.8 746.1,81.6 L752.0,77.3" />
+  <rect x="108" y="84" width="188" height="36" rx="4" class="legend-bg" />
+  <path class="axis" style="stroke-width:2" d="M108.0,84.0 L123.7,84.4 L139.3,84.2 L155.0,83.4 L170.7,84.6 L186.3,83.8 L202.0,83.6 L217.7,84.7 L233.3,83.4 L249.0,84.1 L264.7,84.5 L280.3,83.3 L296.0,84.0 M296.0,84.0 L296.3,90.0 L296.2,96.0 L295.3,102.0 L296.6,108.0 L295.8,114.0 L296.0,120.0 M296.0,120.0 L280.3,120.3 L264.7,120.2 L249.0,119.3 L233.3,120.6 L217.7,119.8 L202.0,119.6 L186.3,120.7 L170.7,119.5 L155.0,120.0 L139.3,120.5 L123.7,119.3 L108.0,120.0 M108.0,120.0 L108.4,114.0 L108.2,108.0 L107.4,102.0 L108.6,96.0 L107.8,90.0 L108.0,84.0" />
+  <rect x="120" y="96" width="11" height="11" rx="2" class="swatch" />
+  <text x="139" y="107" font-size="16" class="fg">nexu-io/opengame</text>
+  <g transform="translate(584, 479)">
+    <path d="M12 2 L14.9 8.2 L21.8 9 L16.7 13.7 L18 20.5 L12 17.2 L6 20.5 L7.3 13.7 L2.2 9 L9.1 8.2 Z" fill="#f2c94c" stroke="#d4a017" stroke-width="1.6" stroke-linejoin="round" />
+    <text x="28" y="16" font-size="15" class="muted">1,380 stars</text>
+  </g>
 </svg>

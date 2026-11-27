@@ -8748,7 +8748,7 @@ it('keeps the game building overlay mounted while a chat is waiting on approval'
 });
 
 it('shows the Super Agent stream scrollbar only while scrolling', async () => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
   try {
     await act(async () => {
       root.render(

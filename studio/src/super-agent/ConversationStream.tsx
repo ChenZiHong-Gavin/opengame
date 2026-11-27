@@ -1713,7 +1713,7 @@ export function ConversationStream({
 
       <div
         ref={listRef}
-        className="om-sa-messages"
+        className="om-sa-messages om-scroll-reveal"
         onScroll={handleMessagesScroll}
       >
         {loading ? (

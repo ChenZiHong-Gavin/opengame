@@ -538,6 +538,21 @@ export function ConversationStream({
   }, [attachments, previewingChipKey]);
   const listRef = useRef<HTMLDivElement>(null);
   const followRef = useRef(true);
+  const messagesScrollTimerRef = useRef<number | null>(null);
+  const handleMessagesScroll = useCallback(() => {
+    const el = listRef.current;
+    if (!el) return;
+    followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64;
+    el.dataset.scrolling = 'true';
+    if (messagesScrollTimerRef.current !== null) window.clearTimeout(messagesScrollTimerRef.current);
+    messagesScrollTimerRef.current = window.setTimeout(() => {
+      messagesScrollTimerRef.current = null;
+      delete el.dataset.scrolling;
+    }, 750);
+  }, []);
+  useEffect(() => () => {
+    if (messagesScrollTimerRef.current !== null) window.clearTimeout(messagesScrollTimerRef.current);
+  }, []);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const mentionMenuRef = useRef<ComposerMentionMenuHandle>(null);
@@ -1699,11 +1714,7 @@ export function ConversationStream({
       <div
         ref={listRef}
         className="om-sa-messages"
-        onScroll={() => {
-          const el = listRef.current;
-          if (!el) return;
-          followRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 64;
-        }}
+        onScroll={handleMessagesScroll}
       >
         {loading ? (
           <div className="om-sa-loading" role="status" aria-label={t('Loading conversation…')}>

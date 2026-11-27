@@ -863,6 +863,42 @@
   padding: var(--motion-space-20) var(--motion-space-24);
   display: block;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+[data-motion-studio] .om-sa-messages {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+[data-motion-studio] .om-sa-messages[data-scrolling='true'] {
+  scrollbar-color: color-mix(in srgb, var(--motion-text) 28%, transparent) transparent;
+}
+
+[data-motion-studio] .om-sa-messages::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+[data-motion-studio] .om-sa-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-motion-studio] .om-sa-messages::-webkit-scrollbar-thumb,
+[data-motion-studio] .om-sa-messages::-webkit-scrollbar-thumb:hover,
+[data-motion-studio] .om-sa-messages::-webkit-scrollbar-thumb:active {
+  border-radius: var(--motion-radius-pill);
+  background-color: transparent;
+}
+
+[data-motion-studio] .om-sa-messages[data-scrolling='true']::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--motion-text) 28%, transparent);
+}
+
+[data-motion-studio] .om-sa-messages[data-scrolling='true']::-webkit-scrollbar-thumb:hover,
+[data-motion-studio] .om-sa-messages[data-scrolling='true']::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in srgb, var(--motion-text) 44%, transparent);
 }
 
 .om-sa-loading,

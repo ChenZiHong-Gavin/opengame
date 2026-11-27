@@ -154,6 +154,7 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     assert.deepEqual(wbConfig.mcpServers.openmotion, { type: 'stdio', command: 'node', args: ['/existing/openmotion/run-mcp.mjs'] }, 'OpenMotion MCP entry must remain untouched');
     assert.equal(wbConfig.mcpServers.opengame.command, process.execPath);
     assert.deepEqual(wbConfig.mcpServers.opengame.args, [path.join(home, 'run-mcp.mjs')]);
+    assert.deepEqual(wbConfig.mcpServers.opengame.env, { OPENMOTION_HOST_AGENT: 'workbuddy' }, 'WorkBuddy transport must tag OPENMOTION_HOST_AGENT for telemetry attribution');
     assert.equal(await readFile(path.join(workbuddyDir, 'skills', 'openmotion-game', 'SKILL.md'), 'utf8'), '---\nname: openmotion-game\n---\nKeep untouched\n');
     const ogSkill = await readFile(path.join(workbuddyDir, 'skills', 'opengame-game', 'SKILL.md'), 'utf8');
     assert.match(ogSkill, /^name: opengame-game$/m);
@@ -259,11 +260,26 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     const skippedStage = await stageNpmUpdate({ home, target: check, installDeps: linkDeps });
     assert.equal(skippedStage.status, 'skipped_bad_version');
 
-    // 7. Force-stage retries the blacklisted v2, passes real live MCP handshake probe, and clears v2 from badVersions.
-    const staged = await stageNpmUpdate({ home, target: check, force: true, installDeps: linkDeps });
+    // 7. Force-stage retries the blacklisted v2, passes real live MCP handshake probe, clears v2 from badVersions,
+    // and preserves a concurrent host registration made by setup() while staging is in flight.
+    const concurrentSkillsDir = path.join(dir, 'cursor-skills');
+    const staged = await stageNpmUpdate({
+      home,
+      target: check,
+      force: true,
+      installDeps: async directory => {
+        await linkDeps(directory);
+        await setup({
+          manifest: pkg1.manifest, home, dataDirectory: dataDir, host: 'cursor', skillsDirectory: concurrentSkillsDir,
+          installDeps: linkDeps, skipStudio: true, skipBackgroundPrepare: true,
+        });
+      },
+    });
     assert.equal(staged.status, 'staged');
     assert.equal(staged.staged.version, v2);
-    assert.equal((await readInstallState(home)).badVersions.includes(v2), false, 'Successful forced probe must remove version from badVersions');
+    const afterStage = await readInstallState(home);
+    assert.equal(afterStage.badVersions.includes(v2), false, 'Successful forced probe must remove version from badVersions');
+    assert(Object.hasOwn(afterStage.hosts, 'cursor'), 'Concurrent setup host registration must survive stageNpmUpdate write');
 
     // 8. Retire any real shared editor started during diagnose, then test standalone busy deferral + idle retire.
     await retireIdleBackend(dataDir);

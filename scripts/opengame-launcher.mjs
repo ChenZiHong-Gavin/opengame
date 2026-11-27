@@ -25,7 +25,7 @@ export { managedBy };
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const bundledManifest = fileURLToPath(new URL('../payload/release-npm.json', import.meta.url));
-const launcherRuntimeFiles = ['runtime-assets.mjs', 'game-workflow-adapt.mjs', 'opengame-hosts.mjs', 'opengame-check-mcp.mjs', 'opengame-updater.mjs'];
+const launcherRuntimeFiles = ['runtime-assets.mjs', 'opengame-hosts.mjs', 'opengame-check-mcp.mjs', 'opengame-updater.mjs'];
 const contains = (parent, child) => {
   const rel = path.relative(parent, child);
   return rel === '' || (!rel.startsWith('..' + path.sep) && rel !== '..' && !path.isAbsolute(rel));
@@ -96,6 +96,10 @@ async function installLauncherSupport(home) {
     for (const file of launcherRuntimeFiles) {
       await cp(path.join(scriptDir, file), path.join(stage, file));
     }
+    await cp(path.join(scriptDir, 'game-workflow-adapt.mjs'), path.join(stage, 'game-workflow-adapt.mjs')).catch(error => {
+      if (error.code !== 'ENOENT') throw error;
+      return cp(path.join(scriptDir, '../shared/game-workflow-adapt.mjs'), path.join(stage, 'game-workflow-adapt.mjs'));
+    });
     const existed = await lstat(targetDir).then(() => true, error => {
       if (error.code === 'ENOENT') return false;
       throw error;

@@ -140,7 +140,6 @@ export async function packageOpenGame(
     for (const name of [
       'runtime-assets.mjs',
       'npm-runtime.mjs',
-      'game-workflow-adapt.mjs',
       'opengame-hosts.mjs',
       'opengame-check-mcp.mjs',
       'opengame-updater.mjs',
@@ -151,6 +150,7 @@ export async function packageOpenGame(
     ]) {
       await cp(path.join(root, 'scripts', name), path.join(installer, 'scripts', name));
     }
+    await cp(path.join(root, 'shared', 'game-workflow-adapt.mjs'), path.join(installer, 'scripts', 'game-workflow-adapt.mjs'));
     await chmod(path.join(installer, 'scripts/opengame-launcher.mjs'), 0o755);
 
     const installerPkg = JSON.parse(await readFile(path.join(root, 'packages/opengame/package.json'), 'utf8'));

@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { extractArchive, processAlive, readJSON, runFile, sha256, withCacheLock, writeJSON } from './runtime-assets.mjs';
+import { extractArchive, processAlive, readJSON, runFile, sha256, withCacheLock, withLock, writeJSON } from './runtime-assets.mjs';
 import { checkOpenGameTransport } from './opengame-check-mcp.mjs';
 import { managedBy, syncInstalledHostSkills } from './opengame-hosts.mjs';
 
@@ -375,11 +375,27 @@ export async function retireIdleBackend(dataDirectory, { fetchImpl = fetch, time
   return { retired: true, busy: false, kind: 'stopped' };
 }
 
+/**
+ * Serialize every install.json read-modify-write on the same `install.lock` held by `setup()` and
+ * `bootstrapForDirectMcp()` so concurrent setup and background updater writes never clobber hosts
+ * or current version state. Always acquire `update.lock` before `install.lock` when both are used.
+ */
+async function mutateInstallState(home, transform) {
+  return withLock(path.join(home, 'install.lock'), async () => {
+    const latest = await readInstallState(home);
+    const outcome = await transform(latest);
+    if (!outcome) return { state: latest, result: undefined };
+    const written = outcome.next ? await writeInstallState(home, outcome.next) : latest;
+    return { state: written, result: outcome.result };
+  });
+}
+
 async function recordBadVersion(home, version) {
-  const state = await readInstallState(home);
-  if (!state) return;
-  const badVersions = [...new Set([...(state.badVersions || []), version])];
-  await writeInstallState(home, { ...state, badVersions, lastUpdateCheckAt: new Date().toISOString() });
+  await mutateInstallState(home, latest => {
+    if (!latest) return null;
+    const badVersions = [...new Set([...(latest.badVersions || []), version])];
+    return { next: { ...latest, badVersions, lastUpdateCheckAt: new Date().toISOString() } };
+  });
 }
 
 export async function stageNpmUpdate({
@@ -446,9 +462,18 @@ export async function stageNpmUpdate({
         appRoot,
         stagedAt: new Date().toISOString(),
       };
-      const badVersions = (state.badVersions || []).filter(version => version !== target.version);
-      await writeInstallState(home, { ...state, staged, badVersions, lastUpdateCheckAt: new Date().toISOString() });
-      return { status: 'staged', staged };
+      const { result } = await mutateInstallState(home, latest => {
+        assert(latest?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
+        if (!force && latest.current.version === target.version) {
+          return { result: { status: 'already_current', version: target.version } };
+        }
+        const badVersions = (latest.badVersions || []).filter(version => version !== target.version);
+        return {
+          next: { ...latest, staged, badVersions, lastUpdateCheckAt: new Date().toISOString() },
+          result: { status: 'staged', staged },
+        };
+      });
+      return result;
     } finally {
       await rm(extractRoot, { recursive: true, force: true });
     }
@@ -457,65 +482,86 @@ export async function stageNpmUpdate({
 
 export async function applyStagedUpdate({ home, fetchImpl = fetch } = {}) {
   return withCacheLock(path.join(home, 'update.lock'), async () => {
-    const state = await readInstallState(home);
-    assert(state?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
-    if (!state.staged?.appRoot) return { applied: false, reason: 'no_staged_update' };
-    const stagedMeta = await readJSON(path.join(state.staged.appRoot, '.npm-install.json')).catch(() => null);
+    const initial = await readInstallState(home);
+    assert(initial?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
+    if (!initial.staged?.appRoot) return { applied: false, reason: 'no_staged_update' };
+    const expectedStagedRoot = initial.staged.appRoot;
+    const stagedMeta = await readJSON(path.join(expectedStagedRoot, '.npm-install.json')).catch(() => null);
     if (!stagedMeta) {
-      await writeInstallState(home, { ...state, staged: null });
+      await mutateInstallState(home, latest => (
+        latest?.staged?.appRoot === expectedStagedRoot ? { next: { ...latest, staged: null } } : null
+      ));
       return { applied: false, reason: 'staged_missing' };
     }
-    const retirement = await retireIdleBackend(state.dataDirectory, { fetchImpl });
+    const retirement = await retireIdleBackend(initial.dataDirectory, { fetchImpl });
     if (retirement.busy) {
       return { applied: false, reason: 'backend_busy', active: retirement.active };
     }
-    const previousVersion = state.current.version;
-    const previous = state.current.version === state.staged.version
-      ? (state.previous || null)
-      : { ...state.current, healthy: true, crashCount: 0 };
-    const current = {
-      version: state.staged.version,
-      sha256: state.staged.sha256,
-      appRoot: state.staged.appRoot,
-      activatedAt: new Date().toISOString(),
-      healthy: false,
-      crashCount: 0,
-    };
-    const next = await writeInstallState(home, { ...state, current, previous, staged: null });
-    await syncInstalledHostSkills(next, current.appRoot, current.version).catch(() => {});
-    return { applied: true, version: current.version, previousVersion, retirement };
+    const { state: next, result } = await mutateInstallState(home, latest => {
+      assert(latest?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
+      if (!latest.staged?.appRoot || latest.staged.appRoot !== expectedStagedRoot) {
+        return { result: { applied: false, reason: 'no_staged_update' } };
+      }
+      const previousVersion = latest.current.version;
+      const previous = latest.current.version === latest.staged.version
+        ? (latest.previous || null)
+        : { ...latest.current, healthy: true, crashCount: 0 };
+      const current = {
+        version: latest.staged.version,
+        sha256: latest.staged.sha256,
+        appRoot: latest.staged.appRoot,
+        activatedAt: new Date().toISOString(),
+        healthy: false,
+        crashCount: 0,
+      };
+      return {
+        next: { ...latest, current, previous, staged: null },
+        result: { applied: true, version: current.version, previousVersion, retirement },
+      };
+    });
+    if (result.applied) {
+      await syncInstalledHostSkills(next, next.current.appRoot, next.current.version).catch(() => {});
+    }
+    return result;
   });
 }
 
 export async function rollbackInstallation({ home, reason = 'manual', markBad = true, fetchImpl = fetch } = {}) {
   return withCacheLock(path.join(home, 'update.lock'), async () => {
-    const state = await readInstallState(home);
-    assert(state?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
-    assert(state.previous?.appRoot, 'NO_PREVIOUS_VERSION: No previous healthy OpenGame version is available for rollback.');
-    const prevMeta = await readJSON(path.join(state.previous.appRoot, '.npm-install.json')).catch(() => null);
+    const initial = await readInstallState(home);
+    assert(initial?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
+    assert(initial.previous?.appRoot, 'NO_PREVIOUS_VERSION: No previous healthy OpenGame version is available for rollback.');
+    const prevMeta = await readJSON(path.join(initial.previous.appRoot, '.npm-install.json')).catch(() => null);
     assert(prevMeta, 'PREVIOUS_VERSION_MISSING: Previous version files are no longer present on disk.');
-    const retirement = await retireIdleBackend(state.dataDirectory, { fetchImpl });
+    const retirement = await retireIdleBackend(initial.dataDirectory, { fetchImpl });
     if (retirement.busy) {
       return { rolledBack: false, reason: 'backend_busy', active: retirement.active };
     }
-    const failedVersion = state.current.version;
-    const badVersions = markBad ? [...new Set([...(state.badVersions || []), failedVersion])] : (state.badVersions || []);
-    const restored = {
-      ...state.previous,
-      activatedAt: new Date().toISOString(),
-      healthy: true,
-      crashCount: 0,
-    };
-    const next = await writeInstallState(home, {
-      ...state,
-      current: restored,
-      previous: null,
-      staged: null,
-      badVersions,
-      lastRollback: { from: failedVersion, to: restored.version, reason, at: new Date().toISOString() },
+    const { state: next, result } = await mutateInstallState(home, latest => {
+      assert(latest?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
+      assert(latest.previous?.appRoot, 'NO_PREVIOUS_VERSION: No previous healthy OpenGame version is available for rollback.');
+      const failedVersion = latest.current.version;
+      const badVersions = markBad ? [...new Set([...(latest.badVersions || []), failedVersion])] : (latest.badVersions || []);
+      const restored = {
+        ...latest.previous,
+        activatedAt: new Date().toISOString(),
+        healthy: true,
+        crashCount: 0,
+      };
+      return {
+        next: {
+          ...latest,
+          current: restored,
+          previous: null,
+          staged: null,
+          badVersions,
+          lastRollback: { from: failedVersion, to: restored.version, reason, at: new Date().toISOString() },
+        },
+        result: { rolledBack: true, from: failedVersion, to: restored.version, reason },
+      };
     });
-    await syncInstalledHostSkills(next, restored.appRoot, restored.version).catch(() => {});
-    return { rolledBack: true, from: failedVersion, to: restored.version, reason };
+    await syncInstalledHostSkills(next, next.current.appRoot, next.current.version).catch(() => {});
+    return result;
   });
 }
 
@@ -531,10 +577,9 @@ export async function runBackgroundUpdateCheck({ home, registries, fetchImpl = f
     registries,
     fetchImpl,
   });
-  await withCacheLock(path.join(home, 'update.lock'), async () => {
-    const latest = await readInstallState(home);
-    if (latest) await writeInstallState(home, { ...latest, lastUpdateCheckAt: new Date().toISOString() });
-  });
+  await withCacheLock(path.join(home, 'update.lock'), () => mutateInstallState(home, latest => (
+    latest ? { next: { ...latest, lastUpdateCheckAt: new Date().toISOString() } } : null
+  )));
   if (!check.available) return { status: check.reason || 'up_to_date', check };
   const staged = await stageNpmUpdate({ home, target: check, fetchImpl, registries, installDeps, probeTimeoutMs });
   return { status: staged.status, check, staged };
@@ -573,27 +618,30 @@ async function spawnBackgroundCheck(home) {
 
 async function markCurrentHealthy(home, expectedVersion) {
   await withCacheLock(path.join(home, 'update.lock'), async () => {
-    const state = await readInstallState(home);
-    if (!state || state.current.version !== expectedVersion || state.current.healthy) return;
-    const next = await writeInstallState(home, {
-      ...state,
-      current: { ...state.current, healthy: true, crashCount: 0 },
+    const { state: next, result: promoted } = await mutateInstallState(home, latest => {
+      if (!latest || latest.current.version !== expectedVersion || latest.current.healthy) {
+        return { result: false };
+      }
+      return {
+        next: { ...latest, current: { ...latest.current, healthy: true, crashCount: 0 } },
+        result: true,
+      };
     });
-    await pruneOldApps(home, next);
+    if (promoted && next) await pruneOldApps(home, next);
   });
 }
 
 async function recordCrashAndMaybeRollback(home, expectedVersion, maxCrashes) {
-  const count = await withCacheLock(path.join(home, 'update.lock'), async () => {
-    const state = await readInstallState(home);
-    if (!state || state.current.version !== expectedVersion || state.current.healthy) return { shouldRollback: false };
-    const nextCount = (state.current.crashCount || 0) + 1;
-    await writeInstallState(home, {
-      ...state,
-      current: { ...state.current, crashCount: nextCount },
-    });
-    return { shouldRollback: nextCount >= maxCrashes && Boolean(state.previous?.appRoot), crashCount: nextCount };
-  });
+  const { result: count } = await withCacheLock(path.join(home, 'update.lock'), () => mutateInstallState(home, latest => {
+    if (!latest || latest.current.version !== expectedVersion || latest.current.healthy) {
+      return { result: { shouldRollback: false, crashCount: 0 } };
+    }
+    const nextCount = (latest.current.crashCount || 0) + 1;
+    return {
+      next: { ...latest, current: { ...latest.current, crashCount: nextCount } },
+      result: { shouldRollback: nextCount >= maxCrashes && Boolean(latest.previous?.appRoot), crashCount: nextCount },
+    };
+  }));
   if (count.shouldRollback) {
     const rolled = await rollbackInstallation({ home, reason: 'crash_loop', markBad: true });
     return { rolledBack: rolled.rolledBack, crashCount: count.crashCount, rollback: rolled };

@@ -3,7 +3,7 @@ import { access, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } 
 import path from 'node:path';
 import os from 'node:os';
 import { canonical, readJSON, runFile, withLock, writeJSON } from './runtime-assets.mjs';
-import { adaptGameWorkflowMarkdown } from './game-workflow-adapt.mjs';
+const { adaptGameWorkflowMarkdown } = await import('./game-workflow-adapt.mjs').catch(() => import('../shared/game-workflow-adapt.mjs'));
 
 // Dedicated registration adapters; any other valid lowercase --host installs the same
 // application, launcher and Skills, returning agentRegistration for that Agent to add.
@@ -105,6 +105,9 @@ export async function hostPlan(options, home, launcher, previous, isSetup = fals
   }
   if (host === 'workbuddy') {
     const configFile = path.join(await canonical(process.env.WORKBUDDY_CONFIG_DIR || path.join(os.homedir(), '.workbuddy')), 'mcp.json');
+    // WorkBuddy desktop sends the MCP server key (`opengame`) as `clientInfo.name`; set an explicit
+    // launch-environment tag so native WorkBuddy MCP traffic attributes cleanly to `workbuddy`.
+    const workbuddyTransport = { ...transport, env: { OPENMOTION_HOST_AGENT: 'workbuddy' } };
     const check = config => {
       assert(config === null || (typeof config === 'object' && !Array.isArray(config)), 'Invalid WorkBuddy configuration');
       assert(config?.mcpServers === undefined || (config.mcpServers && typeof config.mcpServers === 'object' && !Array.isArray(config.mcpServers)), 'Invalid WorkBuddy mcpServers');
@@ -120,7 +123,7 @@ export async function hostPlan(options, home, launcher, previous, isSetup = fals
         await withLock(configFile + '.opengame.lock', async () => {
           const config = await readJSON(configFile) || {};
           check(config);
-          await writeJSON(configFile, { ...config, mcpServers: { ...config.mcpServers, [serverName]: transport } });
+          await writeJSON(configFile, { ...config, mcpServers: { ...config.mcpServers, [serverName]: workbuddyTransport } });
         });
       },
     };

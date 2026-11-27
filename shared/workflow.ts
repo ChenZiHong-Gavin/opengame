@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { adaptGameWorkflowMarkdown, gameWorkflowReadNext } from '../scripts/game-workflow-adapt.mjs';
+import { adaptGameWorkflowMarkdown, gameWorkflowReadNext } from './game-workflow-adapt.mjs';
 export { workflowEntryGuide } from './workflow-entry.js';
 
 export const workflowRegistry = {

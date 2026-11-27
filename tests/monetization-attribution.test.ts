@@ -14,6 +14,7 @@ import {
   buildPlacementId,
   cleanBillingUrl,
   decodeMonetizationShortlink,
+  directAttributedBillingUrl,
   encodeMonetizationShortlink,
   PRODUCT_ID,
 } from '../shared/product-identity.ts';
@@ -123,24 +124,83 @@ test('9-segment monetization shortlink codec matches RFC 4648 Base64URL byte-for
   assert.equal(decodeMonetizationShortlink(Buffer.from('v1|d|only|four').toString('base64url')), null);
 });
 
-test('posthogCommonProperties keeps product=openmotion, adds resolved source_product, and preserves event channel', async () => {
+test('directAttributedBillingUrl formats direct billing destinations with full od_* attribution and zero utm_* params', () => {
+  const entryId = '7d1c6f4e-6a1f-4c55-9a43-0c7a4a0a8f11';
+  const nowIso = '2026-11-27T04:00:00.000Z';
+
+  const planUrl = new URL(directAttributedBillingUrl({
+    target: 'd',
+    entryId,
+    product: 'opengame',
+    channel: 'mcp_stdio',
+    host: 'codex',
+    touchpoint: 'agent_media_upgrade_free',
+    studioId: 'motion',
+    modality: 'video',
+  }, nowIso));
+  assert.equal(`${planUrl.origin}${planUrl.pathname}`, 'https://open-design.ai/cloud/dashboard');
+  assert.equal(planUrl.searchParams.get('billing'), 'plan');
+  assert.equal(planUrl.searchParams.get('od_origin'), 'opengame');
+  assert.equal(planUrl.searchParams.get('od_entry_id'), `opengame-${entryId}`);
+  assert.equal(planUrl.searchParams.get('od_entry_source'), 'agent_media_upgrade_free');
+  assert.equal(planUrl.searchParams.get('od_entry_at'), nowIso);
+  assert.equal(planUrl.searchParams.get('od_placement_id'), 'mcp_stdio__codex__motion__video');
+  for (const key of planUrl.searchParams.keys()) {
+    assert.equal(key.startsWith('utm_'), false, `unexpected utm param: ${key}`);
+  }
+
+  const rechargeUrl = new URL(directAttributedBillingUrl({
+    target: 'r',
+    entryId,
+    product: 'openmotion',
+    channel: 'mcp_http',
+    host: 'claude_code',
+    touchpoint: 'agent_media_balance_low',
+    studioId: 'game',
+    modality: 'audio',
+  }, nowIso));
+  assert.equal(`${rechargeUrl.origin}${rechargeUrl.pathname}`, 'https://open-design.ai/cloud/dashboard');
+  assert.equal(rechargeUrl.searchParams.get('billing'), 'recharge');
+  assert.equal(rechargeUrl.searchParams.get('od_origin'), 'openmotion');
+  assert.equal(rechargeUrl.searchParams.get('od_entry_id'), entryId);
+  assert.equal(rechargeUrl.searchParams.get('od_placement_id'), 'mcp_http__claude_code__game__audio');
+
+  assert.throws(() => directAttributedBillingUrl({ target: 'x' as any, entryId }));
+  assert.throws(() => directAttributedBillingUrl({ target: 'd', entryId: 'not-a-uuid' }));
+});
+
+test('posthogCommonProperties stamps resolved product and source_product, and preserves event channel', async () => {
   const installationId = randomUUID();
-  const common = posthogCommonProperties({
-    endpoint: { env: 'test' },
+  const baseInput = {
+    endpoint: { env: 'test' as const },
     identity: { installation_id: installationId, created_at: new Date().toISOString() },
     device: deviceContext(),
     appVersion: '1.0.0',
     source: 'direct',
     eventId: randomUUID(),
     occurredAt: new Date().toISOString(),
-    entrypoint: 'mcp',
+    entrypoint: 'mcp' as const,
     deviceTimezone: 'UTC',
     utcOffsetMinutes: 0,
-  });
-  assert.equal(common.product, 'openmotion');
+  };
+  const common = posthogCommonProperties(baseInput);
+  assert.equal(common.product, PRODUCT_ID);
   assert.equal(common.source_product, PRODUCT_ID);
-  assert.ok(common.source_product === 'openmotion' || common.source_product === 'opengame');
+  assert.ok(common.product === 'openmotion' || common.product === 'opengame');
   assert.equal(common.channel, 'standalone');
+
+  const priorProductEnv = process.env.OPENMOTION_PRODUCT;
+  try {
+    for (const override of ['openmotion', 'opengame'] as const) {
+      process.env.OPENMOTION_PRODUCT = override;
+      const overridden = posthogCommonProperties(baseInput);
+      assert.equal(overridden.product, override);
+      assert.equal(overridden.source_product, override);
+    }
+  } finally {
+    if (priorProductEnv === undefined) delete process.env.OPENMOTION_PRODUCT;
+    else process.env.OPENMOTION_PRODUCT = priorProductEnv;
+  }
 
   const batches: any[] = [];
   const tracking = createTracker({
@@ -179,14 +239,14 @@ test('posthogCommonProperties keeps product=openmotion, adds resolved source_pro
     assert.equal(batches.length, 1);
     const [upgradeEvent, setupEvent] = batches[0].batch;
     assert.equal(upgradeEvent.event, 'upgrade_link_result');
-    assert.equal(upgradeEvent.properties.product, 'openmotion');
+    assert.equal(upgradeEvent.properties.product, PRODUCT_ID);
     assert.equal(upgradeEvent.properties.source_product, PRODUCT_ID);
     assert.equal(upgradeEvent.properties.channel, 'mcp_http');
     assert.equal(upgradeEvent.properties.studio_id, 'motion');
     assert.equal(upgradeEvent.properties.modality, 'video');
 
     assert.equal(setupEvent.event, 'provider_setup_opened');
-    assert.equal(setupEvent.properties.product, 'openmotion');
+    assert.equal(setupEvent.properties.product, PRODUCT_ID);
     assert.equal(setupEvent.properties.source_product, PRODUCT_ID);
     assert.equal(setupEvent.properties.channel, 'standalone');
     assert.equal(setupEvent.properties.studio_id, 'game');

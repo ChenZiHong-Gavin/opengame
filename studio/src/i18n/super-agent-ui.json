@@ -1143,7 +1143,14 @@
     "Submit": "提交",
     "Top up credits": "去充值",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "你的 OpenDesign 余额不足，无法继续生成素材。充值后我会为你自动继续。",
-    "Balance topped up — please continue.": "余额已充值，请继续。"
+    "Balance topped up — please continue.": "余额已充值，请继续。",
+    "Make your next AAA hit.": "制作你的下一款 3A 大作",
+    "AAA game": "3A 大作",
+    "Game type": "游戏类型",
+    "Remove genre": "移除类型",
+    "Playable ad (game mode)": "赚钱游戏",
+    "Viral game": "爆款游戏",
+    "Make your next viral game.": "做一款你的爆款游戏"
   },
   "ja": {
     "What would you like to create today?": "今日は何を作りますか？",
@@ -2289,7 +2296,14 @@
     "Submit": "送信",
     "Top up credits": "クレジットをチャージ",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "OpenDesign の残高不足のためメディアを生成できません。チャージすると自動で再開します。",
-    "Balance topped up — please continue.": "残高をチャージしました。続けてください。"
+    "Balance topped up — please continue.": "残高をチャージしました。続けてください。",
+    "Make your next AAA hit.": "次の AAA ヒット作を作ろう",
+    "AAA game": "AAA 大作",
+    "Game type": "ゲームの種類",
+    "Remove genre": "ジャンルを外す",
+    "Playable ad (game mode)": "プレイアブル広告",
+    "Viral game": "バズるゲーム",
+    "Make your next viral game.": "次にバズるゲームを作ろう"
   },
   "ko": {
     "What would you like to create today?": "오늘은 무엇을 만들까요?",
@@ -3435,7 +3449,14 @@
     "Submit": "제출",
     "Top up credits": "크레딧 충전",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "OpenDesign 잔액이 부족해 미디어를 생성할 수 없습니다. 충전하면 자동으로 계속 진행합니다.",
-    "Balance topped up — please continue.": "잔액을 충전했어요. 계속해 주세요."
+    "Balance topped up — please continue.": "잔액을 충전했어요. 계속해 주세요.",
+    "Make your next AAA hit.": "다음 AAA 히트작을 만드세요",
+    "AAA game": "AAA 대작",
+    "Game type": "게임 유형",
+    "Remove genre": "장르 제거",
+    "Playable ad (game mode)": "플레이어블 광고",
+    "Viral game": "바이럴 게임",
+    "Make your next viral game.": "다음 바이럴 게임을 만드세요"
   },
   "de": {
     "What would you like to create today?": "Was möchtest du heute gestalten?",
@@ -4584,7 +4605,14 @@
     "Submit": "Senden",
     "Top up credits": "Guthaben aufladen",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "Dein OpenDesign-Guthaben reicht für die Medienerzeugung nicht aus. Lade Guthaben auf, dann mache ich automatisch weiter.",
-    "Balance topped up — please continue.": "Guthaben aufgeladen — bitte fortfahren."
+    "Balance topped up — please continue.": "Guthaben aufgeladen — bitte fortfahren.",
+    "Make your next AAA hit.": "Erschaffe deinen nächsten AAA-Hit.",
+    "AAA game": "AAA-Spiel",
+    "Game type": "Spieltyp",
+    "Remove genre": "Genre entfernen",
+    "Playable ad (game mode)": "Playable Ad",
+    "Viral game": "Virales Spiel",
+    "Make your next viral game.": "Erschaffe dein nächstes virales Spiel."
   },
   "fr": {
     "What would you like to create today?": "Que voulez-vous créer aujourd’hui ?",
@@ -5733,7 +5761,14 @@
     "Submit": "Envoyer",
     "Top up credits": "Recharger des crédits",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "Votre solde OpenDesign est insuffisant pour générer des médias. Rechargez vos crédits et je reprendrai automatiquement.",
-    "Balance topped up — please continue.": "Solde rechargé — veuillez continuer."
+    "Balance topped up — please continue.": "Solde rechargé — veuillez continuer.",
+    "Make your next AAA hit.": "Créez votre prochain hit AAA.",
+    "AAA game": "Jeu AAA",
+    "Game type": "Type de jeu",
+    "Remove genre": "Retirer le genre",
+    "Playable ad (game mode)": "Publicité jouable",
+    "Viral game": "Jeu viral",
+    "Make your next viral game.": "Créez votre prochain jeu viral."
   },
   "ru": {
     "What would you like to create today?": "Что вы хотите создать сегодня?",
@@ -6884,7 +6919,14 @@
     "Submit": "Отправить",
     "Top up credits": "Пополнить баланс",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "На балансе OpenDesign недостаточно средств для генерации медиа. Пополните баланс, и я автоматически продолжу.",
-    "Balance topped up — please continue.": "Баланс пополнен — продолжайте."
+    "Balance topped up — please continue.": "Баланс пополнен — продолжайте.",
+    "Make your next AAA hit.": "Создайте свой следующий AAA-хит.",
+    "AAA game": "AAA-игра",
+    "Game type": "Тип игры",
+    "Remove genre": "Убрать жанр",
+    "Playable ad (game mode)": "Играбельная реклама",
+    "Viral game": "Вирусная игра",
+    "Make your next viral game.": "Создайте свою следующую вирусную игру."
   },
   "es": {
     "What would you like to create today?": "¿Qué te gustaría crear hoy?",
@@ -8033,7 +8075,14 @@
     "Submit": "Enviar",
     "Top up credits": "Recargar créditos",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "Tu saldo de OpenDesign es insuficiente para generar medios. Recarga tus créditos y continuaré automáticamente.",
-    "Balance topped up — please continue.": "Saldo recargado — continúa, por favor."
+    "Balance topped up — please continue.": "Saldo recargado — continúa, por favor.",
+    "Make your next AAA hit.": "Crea tu próximo éxito AAA.",
+    "AAA game": "Juego AAA",
+    "Game type": "Tipo de juego",
+    "Remove genre": "Quitar género",
+    "Playable ad (game mode)": "Anuncio jugable",
+    "Viral game": "Juego viral",
+    "Make your next viral game.": "Crea tu próximo juego viral."
   },
   "pt-BR": {
     "What would you like to create today?": "O que você quer criar hoje?",
@@ -9182,7 +9231,14 @@
     "Submit": "Enviar",
     "Top up credits": "Recarregar créditos",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "Seu saldo OpenDesign é insuficiente para gerar mídia. Recarregue seus créditos e eu continuarei automaticamente.",
-    "Balance topped up — please continue.": "Saldo recarregado — continue, por favor."
+    "Balance topped up — please continue.": "Saldo recarregado — continue, por favor.",
+    "Make your next AAA hit.": "Crie seu próximo sucesso AAA.",
+    "AAA game": "Jogo AAA",
+    "Game type": "Tipo de jogo",
+    "Remove genre": "Remover gênero",
+    "Playable ad (game mode)": "Anúncio jogável",
+    "Viral game": "Jogo viral",
+    "Make your next viral game.": "Crie seu próximo jogo viral."
   },
   "it": {
     "What would you like to create today?": "Cosa vuoi creare oggi?",
@@ -10331,7 +10387,14 @@
     "Submit": "Invia",
     "Top up credits": "Ricarica crediti",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "Il tuo saldo OpenDesign è troppo basso per generare media. Ricarica i crediti e continuerò automaticamente.",
-    "Balance topped up — please continue.": "Saldo ricaricato — continua."
+    "Balance topped up — please continue.": "Saldo ricaricato — continua.",
+    "Make your next AAA hit.": "Crea il tuo prossimo successo AAA.",
+    "AAA game": "Gioco AAA",
+    "Game type": "Tipo di gioco",
+    "Remove genre": "Rimuovi genere",
+    "Playable ad (game mode)": "Annuncio giocabile",
+    "Viral game": "Gioco virale",
+    "Make your next viral game.": "Crea il tuo prossimo gioco virale."
   },
   "tr": {
     "What would you like to create today?": "Bugün ne oluşturmak istersin?",
@@ -11477,6 +11540,13 @@
     "Submit": "Gönder",
     "Top up credits": "Kredi yükle",
     "Your OpenDesign balance is too low to generate media. Top up your credits and I'll continue automatically.": "Medya oluşturmak için OpenDesign bakiyeniz yetersiz. Kredi yüklediğinizde otomatik olarak devam edeceğim.",
-    "Balance topped up — please continue.": "Bakiye yüklendi — lütfen devam edin."
+    "Balance topped up — please continue.": "Bakiye yüklendi — lütfen devam edin.",
+    "Make your next AAA hit.": "Bir sonraki AAA hitini yap.",
+    "AAA game": "AAA oyun",
+    "Game type": "Oyun türü",
+    "Remove genre": "Türü kaldır",
+    "Playable ad (game mode)": "Oynanabilir reklam",
+    "Viral game": "Viral oyun",
+    "Make your next viral game.": "Bir sonraki viral oyununu yap."
   }
 }

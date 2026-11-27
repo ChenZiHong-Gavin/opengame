@@ -2916,9 +2916,10 @@ it('keeps multiplayer games playable in the catalog and only scaffolds single-pl
       await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
     });
     expect(shooterBadge.getAttribute('aria-pressed')).toBe('true');
-    expect(filters.querySelector('[aria-selected="true"]')?.textContent).toContain('Shooter');
-    expect(topBar.textContent).toContain('Shooter');
-    expect(scrollToSpy).toHaveBeenCalledWith({ top: 164, behavior: 'smooth' });
+    // Picking a genre figure only sets the brief's genre: the template list and scroll position stay put.
+    expect(filters.querySelector('[aria-selected="true"]')?.textContent).toContain('All games');
+    expect(scrollToSpy).not.toHaveBeenCalled();
+    expect(topBar.querySelector('.om-sa-game-genre-chip')?.textContent).toContain('Shooter');
     expect(composerSlot.dataset.position).toBe('inline');
     expect(composer.textContent).toBe('A wave shooter where you defend a space station');
     expect(composer.getAttribute('data-placeholder')).toBe('Describe the game you want to make');
@@ -2926,35 +2927,33 @@ it('keeps multiplayer games playable in the catalog and only scaffolds single-pl
     const adTab = [...filters.querySelectorAll<HTMLButtonElement>('button')]
       .find(tab => tab.textContent?.startsWith('Playable ad'))!;
     const selectedShortcuts = () => container.querySelectorAll('.om-sa-game-genre-card[aria-pressed="true"]');
-    const adSwitch = topBar.querySelector<HTMLElement>('[role="switch"][aria-label="Ad-revenue game"]')!;
-    const adSwitchLabel = adSwitch.closest('label')!;
+    // The money-making game option is picked in the hero switch, not the composer toolbar.
+    expect(topBar.querySelector('[role="switch"]')).toBeNull();
+    const [adSwitch, aaaSwitch] = Array.from(container.querySelectorAll<HTMLButtonElement>('.om-sa-game-mode-option'));
     expect(adSwitch.getAttribute('aria-checked')).toBe('true');
     await act(async () => adTab.click());
     expect([...selectedShortcuts()]).toEqual([shooterBadge]);
     expect(filters.querySelector('[aria-selected="true"]')?.textContent).toContain('Playable ad');
     expect(container.querySelectorAll('.om-sa-game-showcase-card[data-orientation="landscape"]')).toHaveLength(0);
     expect(topBar.textContent).toContain('Screen layout');
-    expect(topBar.textContent).toContain('Shooter');
+    expect(topBar.querySelector('.om-sa-game-genre-chip button[aria-label="Remove genre"]')).toBeTruthy();
     expect(adSwitch.getAttribute('aria-checked')).toBe('true');
-    expect(composer.textContent).toBe('A wave shooter where you defend a space station');
-    await act(async () => shooterBadge.click());
-    expect([...selectedShortcuts()]).toEqual([shooterBadge]);
-    expect(topBar.textContent).toContain('Screen layout');
 
-    const racingTab = [...filters.querySelectorAll<HTMLButtonElement>('button')]
-      .find(tab => tab.textContent?.includes('Racing'))!;
-    await act(async () => racingTab.click());
-    expect(racingTab.getAttribute('aria-selected')).toBe('true');
-    expect(topBar.textContent).toContain('Shooter');
+    // The chip's remove button clears the genre; clicking a picked figure again clears it too.
+    await act(async () => topBar.querySelector<HTMLButtonElement>('.om-sa-game-genre-chip button[aria-label="Remove genre"]')!.click());
+    expect([...selectedShortcuts()]).toEqual([]);
+    expect(topBar.querySelector('.om-sa-game-genre-chip')).toBeNull();
     await act(async () => shooterBadge.click());
-    expect(filters.querySelector('[aria-selected="true"]')?.textContent).toContain('Shooter');
+    expect(shooterBadge.getAttribute('aria-pressed')).toBe('true');
     await act(async () => shooterBadge.click());
     expect(shooterBadge.getAttribute('aria-pressed')).toBe('false');
-    expect(gameTab.getAttribute('aria-selected')).toBe('true');
+    expect(filters.querySelector('[aria-selected="true"]')?.textContent).toContain('Playable ad');
     expect(composer.textContent).toBe('');
 
     expect(topBar).toBeTruthy();
-    expect(topBar.textContent).toContain('Genre');
+    // The hero's genre figures pick the genre; the composer toolbar only shows a picked genre as a chip.
+    expect(topBar.closest('.om-sa-composer')).toBeTruthy();
+    expect(topBar.querySelector('.om-sa-game-genre-chip')).toBeNull();
     expect(topBar.textContent).not.toContain('Shooter');
     expect(topBar.textContent).toContain('Art style');
     expect(topBar.textContent).toContain('Setting');
@@ -3005,14 +3004,15 @@ it('keeps multiplayer games playable in the catalog and only scaffolds single-pl
     expect(topBar.textContent).toContain('Screen layout');
     expect(orientationTrigger.hasAttribute('data-active')).toBe(false);
 
-    // The composer toggle changes the creation layout independently of template filtering.
-    await act(async () => adSwitchLabel.click());
+    // The hero switch turns the money-making game option on and off.
+    await act(async () => adSwitch.click());
     await flush();
     expect(topBar.textContent).toContain('Portrait');
     expect(orientationTrigger.hasAttribute('data-active')).toBe(true);
     expect(adSwitch.getAttribute('aria-checked')).toBe('true');
-    expect(gameTab.getAttribute('aria-selected')).toBe('true');
-    await act(async () => adSwitchLabel.click());
+    // Switching the hero mode leaves the template list on the tab the user picked.
+    expect(adTab.getAttribute('aria-selected')).toBe('true');
+    await act(async () => aaaSwitch.click());
     await flush();
     expect(topBar.textContent).toContain('Screen layout');
     expect(orientationTrigger.hasAttribute('data-active')).toBe(false);
@@ -3021,7 +3021,7 @@ it('keeps multiplayer games playable in the catalog and only scaffolds single-pl
     await typeInComposer(composer, 'Pixel shooter in space', { clear: true });
     await act(async () => shooterBadge.click());
     expect(composer.textContent).toBe('Pixel shooter in space');
-    await act(async () => adSwitchLabel.click());
+    await act(async () => adSwitch.click());
     await act(async () => adTab.click());
     expect(adSwitch.getAttribute('aria-checked')).toBe('true');
     expect(topBar.textContent).toContain('Portrait');
@@ -3755,8 +3755,8 @@ it('auto-enters Game mode when opened from Game Studio, plays games in Artifact 
 
   // Auto-switched into Game mode with fanned hero, search input, sort combobox, and masonry waterfall
   expect(container.querySelector('.om-sa-stream')?.getAttribute('data-mode')).toBe('game');
-  expect(container.querySelectorAll('.om-sa-game-fan-card').length).toBeGreaterThan(0);
-  expect(container.querySelectorAll('.om-sa-game-fan-actions .om-sa-game-tile-remix').length).toBe(1);
+  expect(container.querySelectorAll('.om-sa-game-float-item img').length).toBeGreaterThan(0);
+  expect(container.querySelector('.om-sa-game-float')?.getAttribute('aria-hidden')).toBe('true');
   expect(container.querySelector('.om-sa-game-search input')).toBeTruthy();
   expect(container.querySelector('.om-sa-game-sort [role="combobox"]')).toBeTruthy();
   const landscapeCover = container.querySelector<HTMLElement>('.om-sa-game-tile[data-orientation="landscape"] .om-sa-game-tile-cover');
@@ -3790,7 +3790,7 @@ it('auto-enters Game mode when opened from Game Studio, plays games in Artifact 
   expect(gameInput.textContent).toBe('Make a game based on The Little Prince: Star Journey.');
   expect((container.querySelector('.om-sa-send-btn') as HTMLButtonElement).disabled).toBe(false);
   const topBarAfterRemix = container.querySelector('.om-sa-composer-top-bar')!;
-  expect(topBarAfterRemix.textContent).toContain('Genre');
+  expect(topBarAfterRemix.querySelector('.om-sa-game-genre-chip')).toBeNull();
   expect(topBarAfterRemix.textContent).toContain('Art style');
   expect(topBarAfterRemix.textContent).toContain('Screen layout');
   expect(topBarAfterRemix.querySelectorAll('[data-active]').length).toBe(0);
@@ -3802,27 +3802,27 @@ it('auto-enters Game mode when opened from Game Studio, plays games in Artifact 
   expect(container.querySelector('.om-sa-composer-chips')).toBeNull();
   expect(gameInput.textContent).toBe('');
 
-  // Top fanned Hero carousel rotates smoothly via Next/Previous controls and side-card clicks
-  const initialCenterLabel = container.querySelector('.om-sa-game-fan-item[data-slot="0"] .om-sa-game-fan-card')?.getAttribute('aria-label');
-  const nextFanBtn = container.querySelector('.om-sa-game-fan-nav[data-side="next"]') as HTMLButtonElement;
-  expect(nextFanBtn).toBeTruthy();
-  await act(async () => nextFanBtn.click());
+  // The hero switch moves to the AAA headline and display cards, then back
+  const [moneyKey, epicKey] = Array.from(container.querySelectorAll<HTMLButtonElement>('.om-sa-game-mode-option'));
+  expect(moneyKey.getAttribute('aria-checked')).toBe('true');
+  await act(async () => epicKey.click());
   await flush();
-  const nextCenterLabel = container.querySelector('.om-sa-game-fan-item[data-slot="0"] .om-sa-game-fan-card')?.getAttribute('aria-label');
-  expect(nextCenterLabel).not.toBe(initialCenterLabel);
-
-  // Clicking the center Hero card's Remix button selects it into the Agent composer, then clicking again deselects it
-  const fanRemixBtn = container.querySelector('.om-sa-game-fan-item[data-slot="0"] .om-sa-game-tile-remix') as HTMLButtonElement;
-  expect(fanRemixBtn).toBeTruthy();
-  await act(async () => fanRemixBtn.click());
+  expect(epicKey.getAttribute('aria-checked')).toBe('true');
+  expect(container.querySelector('.om-sa-game-float')?.getAttribute('data-theme')).toBe('epic');
+  expect(container.querySelector('.om-sa-mode-hero-copy h2')?.textContent).toBe('Make your next viral game.');
+  await act(async () => moneyKey.click());
   await flush();
-  expect(container.querySelector('.om-sa-composer-chips')?.textContent).toContain('Remix ·');
-  await act(async () => fanRemixBtn.click());
-  await flush();
-  expect(container.querySelector('.om-sa-composer-chips')).toBeNull();
+  expect(container.querySelector('.om-sa-mode-hero-copy h2')?.textContent).toBe('Build games. Turn play into pay.');
 
   // Selecting a gallery template fills an editable draft and preserves user edits across toggles.
+  // The list pages its results, so search for this community racer.
   const racingGame = communityGames.find(game => game.id === 'community-turbo-kart')!;
+  const searchInput = container.querySelector<HTMLInputElement>('.om-sa-game-search input')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(searchInput, racingGame.title);
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await flush();
   const racingRemixBtn = container.querySelector<HTMLButtonElement>(`.om-sa-game-tile-remix[aria-label="Remix: ${racingGame.title}"]`)!;
   await act(async () => racingRemixBtn.click());
   expect(gameInput.textContent).toBe(`Make a game based on ${racingGame.title}.`);
@@ -3837,6 +3837,13 @@ it('auto-enters Game mode when opened from Game Studio, plays games in Artifact 
   // Selecting another template when user has already typed preserves their prompt text untouched
   await act(async () => racingRemixBtn.click());
   expect(gameInput.textContent).toBe('Make the race three laps.');
+
+  // Clear the search so the rest of the AAA batch shows again.
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(searchInput, '');
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await flush();
 
   // Clicking a masonry card cover opens it directly in the viewer (with preconnect on focus)
   const evensong = communityGames.find(game => game.id === 'community-evensong')!;
@@ -3873,26 +3880,7 @@ it('auto-enters Game mode when opened from Game Studio, plays games in Artifact 
   await act(async () => reload.click());
   expect(gameFrame()).not.toBe(originalFrame);
 
-  const sideCards = [...container.querySelectorAll<HTMLButtonElement>(
-    '.om-sa-game-fan-item:is([data-slot="-1"], [data-slot="1"]) .om-sa-game-fan-card',
-  )];
-  const sideGame = communityGames.find(game =>
-    !container.querySelector(`iframe[title="${game.title}"]`) &&
-    sideCards.some(button => button.getAttribute('aria-label') === game.title),
-  )!;
-  const sideBanner = sideCards.find(button => button.getAttribute('aria-label') === sideGame.title)!;
-  const sideFrame = () => container.querySelector<HTMLIFrameElement>(`iframe[title="${sideGame.title}"]`);
-  expect(sideBanner.querySelector('.om-sa-showcase-action-cue')).toBeNull();
-  await act(async () => sideBanner.click());
-  expect(sideBanner.closest('.om-sa-game-fan-item')?.getAttribute('data-slot')).toBe('0');
-  expect(sideFrame()).toBeNull();
-  expect(sideBanner.querySelector('.om-sa-showcase-action-cue')?.textContent).toBe('Try game');
-  await act(async () => sideBanner.click());
-  const bannerFrame = sideFrame();
-  expect(bannerFrame?.getAttribute('src')).toBe(sideGame.external!.url);
-  const sideGrid = container.querySelector<HTMLButtonElement>(`.om-sa-game-tile-cover[aria-label="Try game: ${sideGame.title}"]`)!;
-  await act(async () => sideGrid.click());
-  expect(sideFrame()).toBe(bannerFrame);
+  // Hero cards are display-only; games are opened from the template list.
 
   const search = container.querySelector<HTMLInputElement>('.om-sa-game-search input')!;
   await act(async () => {
@@ -4287,7 +4275,7 @@ it('consumes Cloud deploy requests across viewer remounts and aborts deploy when
   await flush();
   await flush();
 
-  const deployBtn = container.querySelector('.om-sa-game-fan-actions .om-sa-game-tile-deploy') as HTMLButtonElement;
+  const deployBtn = container.querySelector('.om-sa-game-tile .om-sa-game-tile-deploy') as HTMLButtonElement;
   expect(deployBtn).toBeTruthy();
   await act(async () => deployBtn.click());
   await flush();
@@ -8745,6 +8733,140 @@ it('keeps the game building overlay mounted while a chat is waiting on approval'
     expect(document.querySelector('.om-sa-viewer .om-sa-game-draft-stage')).not.toBeNull();
   }, { timeout: 3000 });
   expect(document.querySelector(`.om-sa-viewer iframe[title="${gameArtifact.title}"]`)).toBeNull();
+});
+
+it('opens the Artifact Viewer publish panel directly from the game deliverable hero card and keeps Publish toggle synced', async () => {
+  clearSuperAgentCache();
+  resetGamePublishStore();
+  const chatId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const gameId = 'gold-jar-publish-card';
+  const gameArtifact: SuperAgentChat['artifacts'][number] = {
+    id: `game:${gameId}`,
+    kind: 'game-project',
+    title: 'Gold Jar',
+    subtitle: 'casual · Playable ad',
+    playableAd: true,
+    scenario: 'portrait',
+    projectId: gameId,
+    entry: 'index.html',
+    url: `/motion-api/games/${gameId}/play/index.html`,
+    createdAt: 1002,
+    updatedAt: 1002,
+  };
+  const chat: SuperAgentChat = {
+    ...sampleChat,
+    id: chatId,
+    title: 'Gold Jar',
+    intent: 'game',
+    state: 'idle',
+    approvals: [],
+    messages: [
+      { id: 'm1', role: 'user', text: 'Make a vertical pin-pulling gold jar game', createdAt: 1001 },
+      {
+        id: 'm2',
+        role: 'tool',
+        text: 'Created game',
+        createdAt: 1002,
+        toolEvent: {
+          callId: 'c1',
+          tool: 'openmotion_game_create',
+          label: 'Create game',
+          status: 'done',
+          artifactId: gameArtifact.id,
+        },
+      },
+      { id: 'm3', role: 'assistant', text: 'Gold Jar is ready.', createdAt: 1003 },
+    ],
+    artifacts: [gameArtifact],
+    activeArtifactId: gameArtifact.id,
+  };
+
+  const baseFetch = globalThis.fetch;
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+    if (url === `${SUPER_AGENT_API}/chats` && (!init?.method || init.method === 'GET')) {
+      return json({ conversations: [summarizeSuperAgentChat(chat)] });
+    }
+    if (url === `${SUPER_AGENT_API}/chats/${chatId}` && (!init?.method || init.method === 'GET')) {
+      return json({ conversation: chat });
+    }
+    if (url === `${SUPER_AGENT_API}/chats/${chatId}` && init?.method === 'PATCH') {
+      return json({ conversation: chat });
+    }
+    if (url === '/motion-api/games') {
+      return json({
+        games: [
+          {
+            id: gameId,
+            title: 'Gold Jar',
+            description: 'Pin-pulling game',
+            genre: 'casual',
+            orientation: 'portrait',
+            multiplayer: false,
+            maxPlayers: 1,
+            status: 'ready',
+            source: 'mine',
+            playUrl: `/motion-api/games/${gameId}/play/index.html`,
+            plays: 0,
+            likes: 0,
+            dislikes: 0,
+            createdAt: '2026-11-27T00:00:00.000Z',
+            updatedAt: '2026-11-27T00:00:00.000Z',
+          },
+        ],
+      });
+    }
+    if (url === '/motion-api/settings/account') {
+      return json({ state: 'signed-out' });
+    }
+    return baseFetch(input, init);
+  }) as typeof fetch;
+
+  await act(async () => {
+    root.render(
+      <I18nProvider initialLocale="en">
+        <SuperAgentWorkspace
+          active
+          chatId={chatId}
+          onChatIdChange={vi.fn()}
+          onOpenDesignProject={vi.fn()}
+          onOpenMotionProject={vi.fn()}
+          onOpenAsset={vi.fn()}
+          onOpenBrandKit={vi.fn()}
+          onOpenAgentSettings={vi.fn()}
+          onOpenMcp={vi.fn()}
+        />
+      </I18nProvider>,
+    );
+  });
+  await flush();
+
+  const cardPublishBtn = () => container.querySelector<HTMLButtonElement>('.om-sa-deliverable-card[data-layout="hero"] .om-sa-deliverable-publish-btn');
+  const viewerPublishBtn = () => container.querySelector<HTMLButtonElement>('.om-sa-viewer .om-sa-publish-trigger');
+  const publishPanel = () => container.querySelector('aside[aria-label="Publish panel"]');
+
+  await vi.waitFor(() => expect(cardPublishBtn()).toBeTruthy());
+  expect(container.querySelector('.om-sa-viewer')).toBeNull();
+  expect(publishPanel()).toBeNull();
+  expect(cardPublishBtn()?.getAttribute('aria-pressed')).toBe('false');
+
+  // Click Publish on the hero deliverable card -> opens viewer AND publish panel immediately
+  await act(async () => cardPublishBtn()!.click());
+  await vi.waitFor(async () => {
+    await flush();
+    expect(publishPanel()).toBeTruthy();
+  }, { timeout: 3000 });
+  expect(publishPanel()?.querySelector('[role="radio"][aria-label="WeChat Mini Game"]')).toBeTruthy();
+  expect(cardPublishBtn()?.getAttribute('aria-pressed')).toBe('true');
+  expect(viewerPublishBtn()?.getAttribute('aria-pressed')).toBe('true');
+
+  // Click Publish on the card again -> toggles publish panel closed, keeping both buttons in sync
+  await act(async () => cardPublishBtn()!.click());
+  expect(publishPanel()).toBeNull();
+  expect(cardPublishBtn()?.getAttribute('aria-pressed')).toBe('false');
+  expect(viewerPublishBtn()?.getAttribute('aria-pressed')).toBe('false');
 });
 
 it('shows the Super Agent stream scrollbar only while scrolling', async () => {

@@ -1143,8 +1143,11 @@ export function ConversationStream({
                       style: activeModeOptions.gameStyle ?? selectedTemplate.style,
                       setting: activeModeOptions.gameSetting ?? selectedTemplate.setting,
                       multiplayer: false,
-                      orientation: activeModeOptions.gameOrientation ?? selectedTemplate.orientation ?? 'landscape',
-                      playableAd: isPlayableAd(activeModeOptions) || (activeModeOptions.gameOrientation === null && Boolean(selectedTemplate.playableAd)),
+                      // The Game Studio switch decides the format: money-making builds a portrait playable ad
+                      // even from a landscape community template; the viral-game mode keeps the template's layout.
+                      orientation: activeModeOptions.gameOrientation
+                        ?? (isPlayableAd(activeModeOptions) ? 'portrait' : selectedTemplate.orientation ?? 'landscape'),
+                      playableAd: isPlayableAd(activeModeOptions),
                     }
                   : {
                       prompt: snapText.trim() || gameBrief,
@@ -1544,6 +1547,37 @@ export function ConversationStream({
     />
   );
   const artifactCount = chat?.artifacts.length ?? 0;
+
+
+  // Mode options bar: above the composer for most modes, inside the composer toolbar for Game Studio.
+  // The Game Studio hero (landing page only) puts its options inside the composer toolbar.
+  const gameHeroOnScreen = activeMode?.id === 'game' && !chat?.messages.length && !pendingSubmission && !publishEntries.length;
+  // Inside a Game Studio conversation the composer stays plain (attach, agent, send): the game's options
+  // were picked on the landing page and still travel with each message.
+  const gameConversation = activeMode?.id === 'game' && !gameHeroOnScreen;
+  const modeTopBar = activeMode ? (
+      <ModeComposerTopBar
+        active={active}
+        modeId={activeMode.id}
+        options={modeOptions}
+        attachments={attachments}
+        disabled={sending || hasPendingApproval}
+        // The Game Studio hero owns the money-making game switch while it is on screen.
+        showPlayableAdSwitch={!gameHeroOnScreen}
+        onChange={changeLandingOptions}
+        onCatalogChange={handleCatalogChange}
+        onOpenResourcePicker={category => {
+          setMentionCategory(mapResourceTabToMentionCategory(category));
+          setMentionMenuSource('plus');
+          setMentionQuery('');
+          setMentionMenuOpen(true);
+        }}
+        onOpenModelSettings={() => {
+          if (onOpenModelSettings) onOpenModelSettings();
+          else onOpenAgentSettings();
+        }}
+      />
+  ) : null;
 
   return (
     <section
@@ -2018,27 +2052,8 @@ export function ConversationStream({
           </div>
         )}
 
-        {activeMode && (
-          <ModeComposerTopBar
-            active={active}
-            modeId={activeMode.id}
-            options={modeOptions}
-            attachments={attachments}
-            disabled={sending || hasPendingApproval}
-            onChange={changeLandingOptions}
-            onCatalogChange={handleCatalogChange}
-            onOpenResourcePicker={category => {
-              setMentionCategory(mapResourceTabToMentionCategory(category));
-              setMentionMenuSource('plus');
-              setMentionQuery('');
-              setMentionMenuOpen(true);
-            }}
-            onOpenModelSettings={() => {
-              if (onOpenModelSettings) onOpenModelSettings();
-              else onOpenAgentSettings();
-            }}
-          />
-        )}
+        {/* Game Studio options live inside the composer's toolbar (see below); other modes keep the top bar. */}
+        {activeMode && activeMode.id !== 'game' && modeTopBar}
 
         <div
           ref={composerShellRef}
@@ -2396,7 +2411,7 @@ export function ConversationStream({
                 icon={<RemixIcon name={uploading ? 'loader-4-line' : 'add-line'} size={18} />}
               />
 
-              {active && activeMode && (
+              {active && activeMode && !gameConversation && (
                 <span className="om-sa-active-mode-pill" data-mode={activeMode.id}>
                   <Select
                     appearance="boxed"
@@ -2423,7 +2438,9 @@ export function ConversationStream({
                 </span>
               )}
 
-              {activeMode && (
+              {gameHeroOnScreen && modeTopBar}
+
+              {activeMode && !gameConversation && (
                 <ModeComposerControls
                   active={active}
                   modeId={activeMode.id}

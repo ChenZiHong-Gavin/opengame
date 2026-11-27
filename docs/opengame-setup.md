@@ -33,7 +33,7 @@ npm ci
 npm run build:studio
 ```
 
-The shallow clone includes game source, catalog metadata, covers and the complete Tidebreaker game. Other templates keep binary assets in Git LFS. Studio and MCP fetch the selected template's assets on demand and reuse them in this checkout. To prepare a template for offline use, run `git lfs pull --include="templates/games/<game-id>/**" --exclude=""` from the checkout. Optional videos have separate [storage instructions](repository-storage.md).
+The shallow clone includes catalog metadata, covers, Tidebreaker, and the featured showcase templates. The full catalog of additional templates is pinned by SHA-256 in `templates/game-downloads.json` and downloaded on demand from immutable R2 bundles into your workspace cache the first time you play or remix a title. Any remaining in-repo template with Git LFS assets also fetches on demand (or manually via `git lfs pull --include="templates/games/<game-id>/**" --exclude=""`). Do not bulk-download unselected templates during setup; fetch a game's assets only when the user plays or remixes it. Optional videos have separate [storage instructions](repository-storage.md).
 
 ## Start a separate workspace
 
@@ -52,7 +52,7 @@ $env:MOTION_DATA_DIR = Join-Path $env:USERPROFILE '.opengame\workspace'
 npm start
 ```
 
-Open the exact `previewUrl` returned by startup, then select **Game Studio**, or append `/game` to that origin. Do not assume a fixed port: the runtime may reuse a compatible service or select another free port.
+Open the exact `previewUrl` returned by startup with `/game` appended (or select **Game Studio**) so the user can browse the template gallery and choose a game. Do not assume a fixed port: the runtime may reuse a compatible service or select another free port.
 
 Browse a template and play it. **Remix** creates an independent editable draft in the chosen workspace. In the integrated Studio, this action can immediately hand the task to the selected local Agent; ensure that the intended Agent and model are selected before starting. The service's draft-creation operation alone does not finish the game. An external-client handoff may instead provide instructions to continue in that client.
 

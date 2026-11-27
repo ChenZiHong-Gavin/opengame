@@ -1,0 +1,1005 @@
+{
+  "schemaVersion": 1,
+  "games": {
+    "3d-mahjong": {
+      "sha256": "f38658d92833bac97f0fa791719003ecd3bb31288189da288ecc61c22085e147",
+      "bytes": 6093914
+    },
+    "ace-archer-3d": {
+      "sha256": "82fa65214ae87533338aa4b4da34ef7ced36ea2a071e9b91319768dc0e16bf6b",
+      "bytes": 8212264
+    },
+    "alien-sniper-3d": {
+      "sha256": "cf611ed9f86b21334984ac63ffbd70c50c0163c5f7157ead2dada16a477c4d8b",
+      "bytes": 24592442
+    },
+    "animal-tower-stack": {
+      "sha256": "b067c3a217bb7171242547c424a7904ece335f6a7e25dcc96fb9645e9dce540d",
+      "bytes": 4648830
+    },
+    "apex-drift-3d": {
+      "sha256": "4f208d480b2b5e88ab1cda6ed1fc12f905471164cd896b5e44b2ce0075899ff3",
+      "bytes": 14504332
+    },
+    "apex-food-chain": {
+      "sha256": "9849bc3f3f8ae9c9185074f538a00dc64e0a02a71b02d8e5d67427fc9c18eb01",
+      "bytes": 2306489
+    },
+    "archero-bow-legend": {
+      "sha256": "551cda3dfb6403abc1c8834f0b4d337a2095c708a4b1cd87a64b649446ae2fac",
+      "bytes": 3812035
+    },
+    "arrow-out-3d": {
+      "sha256": "740bef78650d17a5f7d257f2cf13e2fd38e94b665472a32339ace09f046f11f7",
+      "bytes": 8110698
+    },
+    "arrow-pop-clear": {
+      "sha256": "624f1090e5bd24556525f87fce7846f0af5b3bcde096905dca608079b7c5bab8",
+      "bytes": 11996187
+    },
+    "assault-duel-combat": {
+      "sha256": "9c5b8619d378abb81fbcc3bb290aa2b9bd96c7357df1c8f878d3ab175e6e6b1b",
+      "bytes": 8116179
+    },
+    "backpack-hero": {
+      "sha256": "5f8fa2da9aca3c7e03b99cc63bb70e76822297cd8f2dca1580c1d96c92be8589",
+      "bytes": 5885686
+    },
+    "ball-laser-bounce": {
+      "sha256": "572f10fa9f1ece65bf4d726cc8044735c7fdbbbcf9f119269ba282567efe2f73",
+      "bytes": 2076273
+    },
+    "ball-match": {
+      "sha256": "14532d82cde870978469be57eb07c548d9a7a5543f3717ab23a4683f9e01cc1d",
+      "bytes": 3516206
+    },
+    "barehand-fish-catch": {
+      "sha256": "01b16db76cf99404ad9dc87b9ba83da91bb0736b13264a3c38a79bbd84f00416",
+      "bytes": 4179388
+    },
+    "base-defense-battle": {
+      "sha256": "c453846bd6d840f398cacd29ba08db0926e5b17a294afcb04b1af3639d33fc0b",
+      "bytes": 13218235
+    },
+    "battle-cars-arena": {
+      "sha256": "694e97dbc24f3e0f9d4b1ef7245ed38f49811aae391c9725b0d492f6c2579e63",
+      "bytes": 8083716
+    },
+    "battle-cats-clash": {
+      "sha256": "4f9d6248c6901e8fcc4291b54ad5722e4c17c1a0c04e1432edbe6fee6edc18b7",
+      "bytes": 5303927
+    },
+    "beach-soccer-pro": {
+      "sha256": "db0ffbc2327586f55279ac2671fc3800789a5a5f025ed6b3bec15334a8832bfa",
+      "bytes": 5465763
+    },
+    "bear-dash-runner": {
+      "sha256": "da984e54bdab5fda9752be5470ff23e54cb26c4f6d7090706b0f680520645e78",
+      "bytes": 5749684
+    },
+    "big-hero-squad": {
+      "sha256": "75e806d8bcb15b320a7c5d0a61ebee8a684b8a1bf7508246d7874c85ec48f4f6",
+      "bytes": 6691244
+    },
+    "billiards-3d-pro": {
+      "sha256": "85aba6dee113c411353551c9ce160ff28798ca502db68b0c0994c1f7749173d1",
+      "bytes": 11949537
+    },
+    "billiards-trick-shot": {
+      "sha256": "563d884ea0c768f6ef480bd730785215dcea33862d9f70170be4a47cd5d9969e",
+      "bytes": 9097717
+    },
+    "bistro-match-pop": {
+      "sha256": "a1af6a19c0d466d1e6533abb7c15afa23501946b1e42996a51113d28963cc1a7",
+      "bytes": 5841840
+    },
+    "blade-clash-arena": {
+      "sha256": "bc8785e714dc0598a530b8eeba79dceee58d67d4ca22d02165f287edca9680be",
+      "bytes": 4182311
+    },
+    "blade-spin-survivor": {
+      "sha256": "947775cfa633586930dbcc159163140847f1e7d313e7b8b49cecb456f437b973",
+      "bytes": 2999888
+    },
+    "block-blast": {
+      "sha256": "29e5812401819a908849cdd525da3fd13613e350aa3d173b950730c6582ddc8d",
+      "bytes": 3070229
+    },
+    "block-gem-clear": {
+      "sha256": "881b4874bf8a6b8b72e54736d4f2fbcef64435a10fe7b5131f9b750ce60d022b",
+      "bytes": 3245431
+    },
+    "block-jigsaw-3d": {
+      "sha256": "47a9af693ec16d79601195064da56109ce09ac39848d719ccae33eabff9a6165",
+      "bytes": 12987988
+    },
+    "blossom-bloom-match": {
+      "sha256": "c2680fd0386ce396051513feb34c71592f5e1d937c2cb502b9b8d2d5407ad4f9",
+      "bytes": 3346718
+    },
+    "boba-tea-adventure": {
+      "sha256": "a3e41d242a000a5c91ba4279400036c91896967340ba70a903add4b394c0b8c5",
+      "bytes": 7589966
+    },
+    "bottle-fill-puzzle": {
+      "sha256": "4d04e1104fae39b8aa9a52b51619d672911492864926ce5d8249c289ee541ec2",
+      "bytes": 3401761
+    },
+    "breakout-fire": {
+      "sha256": "d3326efee9771c71bdb33b7cd98898b2c5d3096ca9f75a141f2218b039f20977",
+      "bytes": 11455778
+    },
+    "breakout-siege-3d": {
+      "sha256": "e83bf1b6f8a2f286932c73939d529a8f413b5df48bdecdba525ef4b9388ae0a6",
+      "bytes": 15611704
+    },
+    "bubble-bath-pop": {
+      "sha256": "dca773d4bbb91e2d6076356822284a2a29769071a3a36023c4f5bee201894d4b",
+      "bytes": 4819493
+    },
+    "bubble-hex-dragon": {
+      "sha256": "1bf9f2c87eafef2d3a11f875ed6bfb8650a7ec3692a7194026cefac8e6be11b1",
+      "bytes": 18409054
+    },
+    "bug-catcher-3d": {
+      "sha256": "21ce1844fce7b7ab35a20325733078613828fa7a2c25e069ebb1f20b77f6e3db",
+      "bytes": 9094934
+    },
+    "bug-sprint-2d": {
+      "sha256": "4985f66c5dc6720a43ecfb10b71f4ceb7ac93b8ddb60bd450148a691b49b8dd7",
+      "bytes": 10851567
+    },
+    "bullet-storm-horde": {
+      "sha256": "a123b52d649cb29fbdbc23aea86b85ea6141ec865bbc7cb41e95901a1e98db25",
+      "bytes": 5425348
+    },
+    "bus-queue-sort": {
+      "sha256": "9a88570c246d7cdc37ff319b7472313fbf686eedc0e2dc3e69222a75bd3433ed",
+      "bytes": 2725677
+    },
+    "button-cut-200": {
+      "sha256": "6bca29f6153306e680fe2309141b9ec8175ff318875862c1fb4047c7261d770f",
+      "bytes": 5712143
+    },
+    "candy-match": {
+      "sha256": "dad9c2a1c7ebc417df46c4094e4e4f4c19ec8ac604a348222286feea73d9f84c",
+      "bytes": 12223999
+    },
+    "cant-catch-me-run": {
+      "sha256": "90b81890a1a928dcf107087f637062bc6a8ac9a40637ed8faed9c2361b6742de",
+      "bytes": 12319381
+    },
+    "car-color-jam": {
+      "sha256": "1e7771840117f5d538dd3a97580234b261cdd815efeab1b8cd0808b0ecc16aa3",
+      "bytes": 8232095
+    },
+    "car-klotski-3d": {
+      "sha256": "17f08774f33a6169e99c0b91f6fc8b0fed216826ecf9204005ddafbe90df6313",
+      "bytes": 8957204
+    },
+    "cargo-train-puzzle": {
+      "sha256": "6a834d991eb885f7ff844d737b9843ea874a4cbdc6560170ae0e2c37440f1e17",
+      "bytes": 5872839
+    },
+    "catch-fish": {
+      "sha256": "4bc53def8c048e34b9772fee4919e63b9dbfa1eb2de010f53ba54f89b15f86b6",
+      "bytes": 10704792
+    },
+    "catch-goose-3d": {
+      "sha256": "70f18b9bd3a1809ce5fc9f50b7cace5b17fdb13a2fbc76f5b91a775c36fa634f",
+      "bytes": 14948260
+    },
+    "catch-kitty-3d": {
+      "sha256": "3de4c59ad3eb2332f2ad753ae60f72f74c0b5d1bcb465fb9af553b2b2a891146",
+      "bytes": 18983918
+    },
+    "catch-piggy": {
+      "sha256": "c6c679c644c168ffbdf30214d791d57c6c43eafd3ae79f91ee04d2deade96f97",
+      "bytes": 7717012
+    },
+    "ceo-comeback-sim": {
+      "sha256": "666b1674a826a8ca85405589329752d845a5e129f099bae3e97e0cf16612b0ec",
+      "bytes": 8112920
+    },
+    "chamber-block-clear": {
+      "sha256": "3ecb91a6844a49f4499317be212d8e8d2f687bfb95436b13936a9dd2abff1135",
+      "bytes": 11425456
+    },
+    "chibi-3kingdoms": {
+      "sha256": "45e3c37320bf8bed0849186226ea0296c1fddd4d439d101d9ddb2592fedcaed4",
+      "bytes": 6723542
+    },
+    "chill-puzzle-300": {
+      "sha256": "359e7edf3387dddfdbc5e7904f819661e6f55569e5e9d86248258c309e7368ea",
+      "bytes": 9252142
+    },
+    "chinese-chess-solo": {
+      "sha256": "0b73601b2dcc84845fc979339995ca69c584cf80a1a3e85a0aa5eae6b05368f7",
+      "bytes": 6130422
+    },
+    "chubby-bird-gym": {
+      "sha256": "bf155e42f75e44181d37e047b4f89843b63a427735516144712daf34ad10fe9a",
+      "bytes": 25036591
+    },
+    "chubby-hero-run": {
+      "sha256": "fbb809df5c035f6a21f61fbf8ce785dc4db7ee4261bd7467380a4f6d316542f9",
+      "bytes": 10121247
+    },
+    "classic-jigsaw": {
+      "sha256": "e65e0d06bd2138dc6aa0b31ea954a5b825786ba6977201e481db55b8d278a00e",
+      "bytes": 7715049
+    },
+    "classic-sokoban-box": {
+      "sha256": "95597a3de23a08018e81dacac7aab893269697014434a51f6c91bf4ce7831994",
+      "bytes": 2284466
+    },
+    "classic-sudoku-pro": {
+      "sha256": "142e09237343febd565bc230c15dfdf7c2ee5598467ad752b1bb118a61251bbc",
+      "bytes": 2715416
+    },
+    "cliff-escape-jump": {
+      "sha256": "bb7b6f288f200315267db82ed782afa65ad233d532ba1191ee8583ee44571124",
+      "bytes": 2333339
+    },
+    "cloud-2048-match": {
+      "sha256": "c70c76f70efe2a7fcda33493a6aa093c84193f98c5b4988135da378a2e048c4d",
+      "bytes": 2751072
+    },
+    "color-jump-arcade": {
+      "sha256": "a8951f87ee744cdc28e5b726256bd7d0f84f9f7f09d17ac11a3fb6ad3ddc74b0",
+      "bytes": 1357920
+    },
+    "comeback-life-quest": {
+      "sha256": "a752196a31bdc8d87d36e1c4012ae508e2746ecbf914f5e7135fd5cd026bd8b1",
+      "bytes": 15176901
+    },
+    "corgi-dash-run": {
+      "sha256": "908ac97c9583b19d62368ec4f46a98616fe9b34c88646fc89e65972253ece9f5",
+      "bytes": 2991123
+    },
+    "crazy-crowd-brawl": {
+      "sha256": "5c8a41a4214610b81f2d3952ebfde0b3677c2a6bebb8aa36cba6dd2fe7e9d841",
+      "bytes": 6074954
+    },
+    "crowd-rush-3d": {
+      "sha256": "b2c1e72ab375559fb5a8696e27c976e790766196ffb3a7630bab874dcb2f2ead",
+      "bytes": 20019805
+    },
+    "cube-chain-2048": {
+      "sha256": "852386a569f01a894dfd66216bb08f34ac2282c15dfac4254819daf4c7ad4c51",
+      "bytes": 6702290
+    },
+    "cut-the-rope-mini": {
+      "sha256": "815d3eba3a0067342b19c73383739af8a5bf16a64bec57f6f46f3d76798240b9",
+      "bytes": 7533583
+    },
+    "cyber-wooden-fish": {
+      "sha256": "449729519a5275d92a09bf3f76779bcc6e73e74a7621b387512ba6c02d45c68e",
+      "bytes": 4560834
+    },
+    "daily-drift-3d": {
+      "sha256": "c58f0ae0b19bca25d25f68991e41dfc048dc7340697262b1397970a2037692f3",
+      "bytes": 24749596
+    },
+    "daily-match-pop": {
+      "sha256": "6196493f7eed9f8824695a50358a0189f76928e82dd895d6be60b2f2e545814c",
+      "bytes": 7669072
+    },
+    "daily-meme-quiz": {
+      "sha256": "2dcca48f5372fdb4a55dcd2655cda7a0dfce554b5d7f0e852aac4a77d80bcba6",
+      "bytes": 5885203
+    },
+    "dino-island-3d": {
+      "sha256": "73ce9854036565e870b2e0c99247e0727631467166c29b747e9a0baaab61f957",
+      "bytes": 18489070
+    },
+    "dino-merge-evo": {
+      "sha256": "1b830728a573ccd8c12b00da2254ecbe0447e7203c1a6e4f7b58d550d5f4f2d4",
+      "bytes": 18829894
+    },
+    "doctor-sim-3d": {
+      "sha256": "f45bc09cb5cc94bff3b57950a8cf0cb440bfbf75fc923cdc1cf3b14e1c7ce64e",
+      "bytes": 9424907
+    },
+    "doomsday-escape-run": {
+      "sha256": "a4ce4572c57e41e2cf051ab8bf14945b9f0afd65833a7b37f431d71be50dc0f4",
+      "bytes": 14821363
+    },
+    "doomsday-survivor": {
+      "sha256": "bc73cc5b598519b02f5dc6a49075175e5d5c09835d93a7d14fac65a24a6efc16",
+      "bytes": 17941914
+    },
+    "doomsday-zombie-rush": {
+      "sha256": "d145b56570b7432dbe073e9dba17d55097a77fc405a528522ae094f69fbb5be1",
+      "bytes": 31469824
+    },
+    "draw-maze-puzzle": {
+      "sha256": "974be9704fe514df2a9832b4eafe90a38cd5dd619621c229e2c48b28bdf5b801",
+      "bytes": 6978155
+    },
+    "dream-kitchen-chef": {
+      "sha256": "caafa97d32a4a2af853092881f27d23205cc2146947fb4aec620c07f88313d35",
+      "bytes": 11035516
+    },
+    "drift-king-rush": {
+      "sha256": "289a3bd39f820cfc14126a2197e8cb5658d3a46eb7dabfe7588856d5718d50f0",
+      "bytes": 3437549
+    },
+    "dual-lane-racer": {
+      "sha256": "5c067f8d5323dac47cbe52ca26b16769b408d0d9c976373f3721509a71469cc5",
+      "bytes": 17226925
+    },
+    "duck-king-arena": {
+      "sha256": "287c167634f329047fa41cb15b18fdd57366c9911fd4d7923b5471930cf06488",
+      "bytes": 2161879
+    },
+    "duke-duck-quest": {
+      "sha256": "258a6dc6b5a0a599b0d2e2557da8a98bea811a25081678a0fca14a5eb76a8b49",
+      "bytes": 11039061
+    },
+    "dungeon-escape-horde": {
+      "sha256": "6af799d0a6342e6c36cad79f93828b0e94a72f16301c23f1fcd608877a4c02a4",
+      "bytes": 18527857
+    },
+    "eagle-eye-spotter": {
+      "sha256": "d845e732e97dc8a1f67fa27ce1a04eeb65b82a539f4c31367bfb7bd842d18645",
+      "bytes": 10694414
+    },
+    "earn-100-million": {
+      "sha256": "d60a40c4572fc97071f0138c36e9c02fd0b50fca92a9bf9362d2f60c6fe489ae",
+      "bytes": 3563237
+    },
+    "escape-match": {
+      "sha256": "4b11d3055ecc9c61cf82e4e89d236caade64f02c513e07a4afe6d57be87bb864",
+      "bytes": 10996597
+    },
+    "farm-match-harvest": {
+      "sha256": "927e367d4a502352f0c5d330ff170f844929cea81a99d325be0ddb96f0443b50",
+      "bytes": 16880786
+    },
+    "find-the-cow": {
+      "sha256": "cf08a277032e1e7e7fc908b103daac21e26e1cbc4b34bebd5462f23ad37e94e3",
+      "bytes": 7624425
+    },
+    "fire-water-duo": {
+      "sha256": "fe661c1ed06a5a21ef980633b67f9c3280d8e091e4817b87a8ab2bfd3e2d90f9",
+      "bytes": 6882901
+    },
+    "five-star-clinic": {
+      "sha256": "05d85ae0964750ec212a8dc18d204ef697b68cc3a5a1ba67540385852d99054e",
+      "bytes": 6278886
+    },
+    "fix-the-typo": {
+      "sha256": "242995628aaa9c4cd192d623042cfb5eb3ef9a28aa1eabc4afbf1458cf672daa",
+      "bytes": 3847991
+    },
+    "flappy-pixel-bird": {
+      "sha256": "17a2175981a010c8d143d7583a90b7b6c04aae7509e86cc7718b4ea09639af20",
+      "bytes": 2244957
+    },
+    "fruit-bubble-pop": {
+      "sha256": "41fda286b945a0b76e5ef27c71e239323f3f5868c5a1893663ec503cf1b76c27",
+      "bytes": 3130562
+    },
+    "fruit-link-match": {
+      "sha256": "9487cb6fe6913579281ac2cb01466f6debc795757df26554a526e3d234deb03f",
+      "bytes": 3228214
+    },
+    "fruit-slash-frenzy": {
+      "sha256": "ec21d3b4a6e591f00a25c5a0b2ed85715f27940b190bf5951b51213a4cfc3691",
+      "bytes": 16235368
+    },
+    "garden-makeover-match": {
+      "sha256": "ba8887804c127d833b8cdd0d38b828bf34594ff3285fa1f87acabeef2127ee5d",
+      "bytes": 11543116
+    },
+    "giant-rush-3d": {
+      "sha256": "3d74665efd928c510e86fafa54c3dceb1a26e26d4627528bd97e45dc00d01c87",
+      "bytes": 14564939
+    },
+    "gold-miner": {
+      "sha256": "310d27d042fa79248c1dc46f6525c166edb537fc7d91579e6a88806f738e9178",
+      "bytes": 400519
+    },
+    "gomoku-ai-pro": {
+      "sha256": "4419261fafa041168081cd51ca55b1edfda1a4f0d33e722028f3db4b9cd21f93",
+      "bytes": 7430596
+    },
+    "goods-sort-master": {
+      "sha256": "6e543c1f7fb4fa87866b7d03fc90b9c2cf3d6f06cbf0ea6648d75e4cfb5fcfc8",
+      "bytes": 6634832
+    },
+    "goofy-crazy-td": {
+      "sha256": "6f19203cb717af5e2dc00212bbeb3dc73bdbd547d23ebe013a77197d9d04e2b6",
+      "bytes": 16492584
+    },
+    "grab-a-baozi": {
+      "sha256": "51ba7c8dc9edfd6754a5c6d48f209251af17765364e1f4a277fbcb0f2cde7e5f",
+      "bytes": 7765961
+    },
+    "gunner-rooster-run": {
+      "sha256": "13f80fb864d6acf92d99d0b73919d4ed23786bd3f61487a263c2f5e9f6ca6c6a",
+      "bytes": 6765193
+    },
+    "hammer-screw-jam": {
+      "sha256": "cf9a29af36ba3a2198db633edd6189e114e3bfdb983a0b046389a4c1e102c855",
+      "bytes": 5708570
+    },
+    "hanzi-brain-spot": {
+      "sha256": "7d8494e970826590417209fb5eb9332c344a105c047b8eb6398afbee50156e7e",
+      "bytes": 5044007
+    },
+    "hanzi-meme": {
+      "sha256": "9f59441591f76166e2dbb01dbb2fe59c989fb0cf21540ae97ca3b80f184dcb90",
+      "bytes": 3406025
+    },
+    "happy-glass-draw": {
+      "sha256": "8bd10121a8fa20364d3e9d56006a7732d49f47b27c52725a71f026f09de6f831",
+      "bytes": 2778236
+    },
+    "haunted-dorm-clash": {
+      "sha256": "dd23a6f4befcb68fb1d0c537b6ce6c54cebad9ae763ce644d59e4a5c3b4e91a8",
+      "bytes": 7895066
+    },
+    "hero-guard-td": {
+      "sha256": "ab9e6b56c11963944e374d5acd9e6acf06d00946c3ec0da5fa0fcfcf95fa7c36",
+      "bytes": 21287375
+    },
+    "hero-tower-climb": {
+      "sha256": "40068c1d2ff60c2ee700908c5e93ff3593280dcae90bbcacc51ccb300a946fb8",
+      "bytes": 5190748
+    },
+    "heroes-tactics-war": {
+      "sha256": "7ba4890663e63f38192f26f5bf8780ae492a5c5ecd9f142bb58dcc17318f0f32",
+      "bytes": 3526925
+    },
+    "hexa-clear-puzzle": {
+      "sha256": "9ee5835d364593dd8034052f7d0fc9af387e9cded3345e3260e71178b56706ac",
+      "bytes": 3756002
+    },
+    "hoop-dunk-master": {
+      "sha256": "f356c9ce214fa51bb9f524031a0d64c89682e1e157338e3f28995d136aeb0641",
+      "bytes": 6333985
+    },
+    "human-cannon-blast": {
+      "sha256": "0bb1c5707ac05f45fcaf12559f848a7da568c64afa860eb1052a1ebaf7b529ca",
+      "bytes": 2648192
+    },
+    "idiom-chain-pro": {
+      "sha256": "e94bcf8e7ef2dbada408b1d7cc9c13668e5f23a37373d909ef8cdd44d5c211b3",
+      "bytes": 4475471
+    },
+    "idiom-hero-202": {
+      "sha256": "939241f876255f6f68a16dacdd41235bb792a00ca5df9cffd6303644fdbf39f6",
+      "bytes": 6632710
+    },
+    "idle-big-boss": {
+      "sha256": "5d6bfcc0af6ec1b641730baf8763b7187360fae881300455c592bb28bf788a7d",
+      "bytes": 20919576
+    },
+    "imperial-palace-merge": {
+      "sha256": "b5957c0143e76e70ae2fae5bffdd2ba17051d78dde7102c36b935fc082cf63e0",
+      "bytes": 12004618
+    },
+    "invincible-tower-td": {
+      "sha256": "f9b4d9ca15ed6e0b1f4817b17377ee41557575b06645a7a52c07e4b714ae6c21",
+      "bytes": 14151599
+    },
+    "judge-idiom-court": {
+      "sha256": "187e6fedd038807fc638809f61d498b56791abf04abd1e6761540bc793f8cd77",
+      "bytes": 5131035
+    },
+    "jump-jump-3d": {
+      "sha256": "93497eb0db18c1625eb777f8774123bc5a4831f7c090bc391a5e1765b247cd54",
+      "bytes": 4526964
+    },
+    "kazehane": {
+      "sha256": "03a9011ed3d072d6919a95c7f2eb66d8ad1bd588bfe4f3cd1a77385dd48c9b73",
+      "bytes": 7516773
+    },
+    "king-brick-breaker": {
+      "sha256": "a09df0532727aff65f6edd594614747c6836f7958f427361617006cf4cf637cf",
+      "bytes": 2339181
+    },
+    "kitty-block-jam": {
+      "sha256": "8837b8d1acaa02530d0497987e731adf04417be032eebc99d0fc4cf84637b9a3",
+      "bytes": 17210588
+    },
+    "kitty-match-3d": {
+      "sha256": "5ee7b1a0935ce0f3d450472cdee4a60b9c3b526526d9e4723f7becf1d97224dd",
+      "bytes": 4180832
+    },
+    "kitty-snack-shop": {
+      "sha256": "f0f58ffa20ca6920272b0a371101fb1179acc978fa15d2634a275b2ca3d63ecb",
+      "bytes": 5046784
+    },
+    "knife-throw-frenzy": {
+      "sha256": "5db4037e28cb93af082ab3a5768c43c9c3b201c44d29f0e1c0cafdb2202aa225",
+      "bytes": 4296063
+    },
+    "knit-98k-shooter": {
+      "sha256": "988fdb3506491676dbcf10f99b83feb8ad0c6eead0b87e74d1381ae432e1cdb5",
+      "bytes": 6950670
+    },
+    "knit-yarn-unravel": {
+      "sha256": "563eded799426d34ea5b8683a73c12f3f2ea1321cfdd16ac269c889ed7214f6d",
+      "bytes": 3267720
+    },
+    "lazy-cat-runner": {
+      "sha256": "44ca34a72757140159515eb04222cf5dd0fdcf15bf99b24a08ac4876725cc3c7",
+      "bytes": 14104812
+    },
+    "life-restart-sim": {
+      "sha256": "eb711b52db6f9a5fdbd3355f365bb3f2753cd42b8f82031c8fb9d0bb4b15c3c3",
+      "bytes": 3945578
+    },
+    "lipstick-pin-hit": {
+      "sha256": "09a2c1f15908357851c3d61dba17646b8313380e7accd018c4b899aeb59c14d1",
+      "bytes": 2149664
+    },
+    "livestream-tycoon": {
+      "sha256": "355d30d7e11738dc07c3719837e27354439064a25e7f00d9d19479b98f8f7ea8",
+      "bytes": 16218414
+    },
+    "ludo-aero-chess": {
+      "sha256": "203d5626196ac3181a148873188f1e269cc58cfbfbfe4e592480c0389e369286",
+      "bytes": 7769821
+    },
+    "magic-tower-rpg": {
+      "sha256": "8a9de215f58b632180a1e28b45e9fc947b5c9a2e9e163a41bd65a233dabd3484",
+      "bytes": 5323131
+    },
+    "mahjong-chill-sort": {
+      "sha256": "3e1710e901c9f1506c1ce239d6eb93553f544b2cbc9085860d3f57142bc47d6d",
+      "bytes": 3796880
+    },
+    "mahjong-kong-pop": {
+      "sha256": "cf213fb921c5764feb10b6db7377f8930cd815f0e669868212b817d3d301ca58",
+      "bytes": 8293416
+    },
+    "mahjong-meld-pop": {
+      "sha256": "4a1eb178340be3c9329e97f6bbd419739928684103fa968e36c746bfdb105496",
+      "bytes": 14110355
+    },
+    "mahjong-pairs": {
+      "sha256": "7e978e3857c40a78bfcbc3005dd4b0440d38bcb7b8768b53308bea2656337726",
+      "bytes": 2960806
+    },
+    "mahjong-slide-pairs": {
+      "sha256": "39d47ea774144ba7d684b4d67011a6b284a15a9ef26370084421d562a53d05c3",
+      "bytes": 5184718
+    },
+    "marry-billionaire-sim": {
+      "sha256": "9c08966b6888fcd243c45a976a12f7dc4f0f66e99291b91f25f34826e51920b0",
+      "bytes": 3726798
+    },
+    "master-chef-bistro": {
+      "sha256": "d154f19ee4e7de9fbe7579b74bed0f7854145ae858cc1b6057a48229ccc960ee",
+      "bytes": 4982218
+    },
+    "master-hunter-3d": {
+      "sha256": "fc9c202f30eb80cf24cbb7223468234380390643e9c329dd0abe481735f4e056",
+      "bytes": 7202921
+    },
+    "meme-spot-diff": {
+      "sha256": "c062892e4ab7c2e04adb6180fb49c47d59fd7de5ece37406cc9b91c0c1825b3c",
+      "bytes": 15919108
+    },
+    "meme-spotter-king": {
+      "sha256": "1534d006bcce7469127f49575dda9a803e1b75dd153333f6f2b54c06d8fc55b0",
+      "bytes": 10262897
+    },
+    "memory-journey-card": {
+      "sha256": "2e647072201b154e1fe4d2ff5b9fd0a333d9600ad010b4a99248b4a5e6f3f905",
+      "bytes": 4272607
+    },
+    "merge-dream-home": {
+      "sha256": "ea04b668e6d8b485e9e9cb98e29722a6e282b4ceb5fe9d0e5a5a354d594e66ad",
+      "bytes": 11083957
+    },
+    "merge-fight-td": {
+      "sha256": "4071be21d3cdc30271e3916e9648f027755e7409c1ceaf034a730b03342ada6e",
+      "bytes": 19805624
+    },
+    "merge-plants-zombies": {
+      "sha256": "53f7445b0a0c4934405efa79c784c7bd33da0467f2cec26bd11a2eea982a0622",
+      "bytes": 8325390
+    },
+    "merge-to-ten": {
+      "sha256": "fa8689d1a757dec8728a0807bedc23b4a229371dbc34ea932668cfef496b5176",
+      "bytes": 1657989
+    },
+    "merge-tower-defense": {
+      "sha256": "8dcf4da0b82ad7831a243bd78cfdb0dc3052c22ffe4cfcc8ca0667ea538cee6e",
+      "bytes": 6291102
+    },
+    "mermaid-pin-rescue": {
+      "sha256": "52ddfa618570dfe306834ffa498975714309cc3770980b9828deb867292270d3",
+      "bytes": 3332996
+    },
+    "model-jigsaw-3d": {
+      "sha256": "895391e3fe9cae41b8ada326ae112e960268608a70c5bdb4753034be3607c810",
+      "bytes": 13793964
+    },
+    "monkey-dash-3d": {
+      "sha256": "c4ba201dbd9820aa7e41753ade6e0832084beeffc6ace564984218615657ff00",
+      "bytes": 10088283
+    },
+    "monkey-mart-idle": {
+      "sha256": "31009a5ff0f898964b286ebaaa126334ea9f21b304c6438b3be621d191a4bf5a",
+      "bytes": 5457090
+    },
+    "music-ball-3d": {
+      "sha256": "c0e898c6e6856287b2747cba596eba38dcd1e89eac057f071b49cc7c26e09b98",
+      "bytes": 3995877
+    },
+    "my-burger-bistro": {
+      "sha256": "e53db059c24fd5ebc41d39a9786e6eb7ee088d8e09bc804f072cf74f6c9d2808",
+      "bytes": 26938421
+    },
+    "number-link-2248": {
+      "sha256": "4893c6c7056f7ab166d5df3fed56164444f89b24d497f94cb04cf2152731425c",
+      "bytes": 10297503
+    },
+    "ocean-fish-match": {
+      "sha256": "17b82550698e028f956bd3b72decc40d6ce6557b19e639730db3fc27ba86114d",
+      "bytes": 8336074
+    },
+    "one-stroke-dots": {
+      "sha256": "5706e15dd636ae8fc3a1222327704001c4d96c16f2f517bd665ab3920f1b5fb2",
+      "bytes": 8584844
+    },
+    "panda-bubble-pop": {
+      "sha256": "f5af96c0f7695c555242c5417fe07dd9e6838e5f7721d7ea1f02b58dfd231e1c",
+      "bytes": 3674117
+    },
+    "paper-cut-master": {
+      "sha256": "00d44834a6cc992c0eefcaca48d5f716ccda702ba33d77c1be9ec353758cebf9",
+      "bytes": 3617290
+    },
+    "paper-maze-klotski": {
+      "sha256": "79686188221253ed9d9d738c735a9de797887363979be42d853f1c43ab7e82aa",
+      "bytes": 11407075
+    },
+    "parking-jam-hero": {
+      "sha256": "adbfba65f03d0202bdba39929ec1b4046d4d0c21129718644431bfbd234eea41",
+      "bytes": 6519109
+    },
+    "phantom-shooter": {
+      "sha256": "afe2f2f2bbc331a97952fa0454aee66995a0f5fbca6b10b96e1be034c1b0e7ce",
+      "bytes": 19142857
+    },
+    "piggy-escape-jam": {
+      "sha256": "5fb54a3c2ef69838523812abc4dfc87705d3b9391553a5a7e300cdf21682da26",
+      "bytes": 7493602
+    },
+    "pill-syringe-sort": {
+      "sha256": "a3b4cc0961266d2891ab92987b48d8f596d89d7e76d9dd1f2531cf6c592a3436",
+      "bytes": 3439277
+    },
+    "pinball-bricks-2999": {
+      "sha256": "17c725821ee595c59b26c27af809a19404e265f04891afcce39bc499c425acc3",
+      "bytes": 16492924
+    },
+    "pipe-ball-sort": {
+      "sha256": "6b6d851fa7d96154c7793d6339ae6654ee66d01694344a060b9c617a13e7440c",
+      "bytes": 5802797
+    },
+    "pipe-twist-flow": {
+      "sha256": "f546d2dd11418920d8923387a57ee107c5bf252708478a0941fdc3c7c6f00a04",
+      "bytes": 7792360
+    },
+    "pixel-air-strike": {
+      "sha256": "4fbfa1b581d7e687fe3f0eee6853ea0c4462b143ed717b60dfa40ec8d47b72ef",
+      "bytes": 2755024
+    },
+    "pixel-block-clear": {
+      "sha256": "1070f15c1db7a6c7061e673f5d57f66c1920465ecabcae515408341fa16868af",
+      "bytes": 7592344
+    },
+    "pixel-fish-ocean": {
+      "sha256": "7fa213765dc433172cc69fddfd7d88b6a2ab929c5e95585393da97c9e7f52ddb",
+      "bytes": 5730202
+    },
+    "plane-fight-arcade": {
+      "sha256": "2b45bb4660cb4cf92435244ce49ac34bb2618d3148ed942622f4e0588f273977",
+      "bytes": 5596650
+    },
+    "planet-knife-battle": {
+      "sha256": "03ebc3e056255169b0d8ebbe324cf1b805bbae57dfb1df83b2bf473e8e187787",
+      "bytes": 4372947
+    },
+    "plants-vs-zombies": {
+      "sha256": "2c25799fc2b4997a1e1b953c0d49c5b6167edb72f2bcd764679fbc52d5f39d96",
+      "bytes": 31331998
+    },
+    "poetry-flower-chain": {
+      "sha256": "b6c134488cff3bdaf057f04be20c63823cb5485a98698a8e3a510b54fb09e7f6",
+      "bytes": 10481734
+    },
+    "power-ludo-chess": {
+      "sha256": "3b6da27430870a71c9fac0752d614b26c94bf6a5d99aafe27c7a2f06fc77b1d1",
+      "bytes": 19894881
+    },
+    "pudding-boy-hop": {
+      "sha256": "5b0a7202f195d175c804771a01be72a7724450fc64b032495c48b69cc18f1ae7",
+      "bytes": 3038302
+    },
+    "pull-pin-rescue": {
+      "sha256": "dc102c95eca30c675e21ae464a3265c9ce6afae56dcaebf0a1a7c79abf70261d",
+      "bytes": 10322092
+    },
+    "queen-run-3d": {
+      "sha256": "5925166679eaa07963313a8fb194297276573ce6e1b917c9090e6c50d76258ee",
+      "bytes": 10412889
+    },
+    "ring-stack-match": {
+      "sha256": "edb80002e9490ea414b14403941cf78de460dd90c762c48a4359161035b77bd3",
+      "bytes": 2629423
+    },
+    "ring-unlock-puzzle": {
+      "sha256": "88cb72552d309559501d8fc38219b64ba2ad5e8aeed49b5bfe803bf62be671dd",
+      "bytes": 2638295
+    },
+    "river-pals-sail": {
+      "sha256": "203b698e24410b90cf86b139aa9119810a19aa0fb3e980312b92294e0a803d8c",
+      "bytes": 6454391
+    },
+    "roll-ball-home": {
+      "sha256": "f9d88892a1ee40fa1c5a4c2a255cb02d6ecfa50407fefd8c82f1f825b7fc6985",
+      "bytes": 6964608
+    },
+    "rope-untangle-3d": {
+      "sha256": "246916861604b5c3d2e55425ba12e2f8b2ced8295ee9f87ce0d0725959ea2cae",
+      "bytes": 8461008
+    },
+    "sand-tetris": {
+      "sha256": "2fab400bd772c52cc69699dca898131b723998b1dda1949368503bb740a51fa1",
+      "bytes": 2277558
+    },
+    "sausage-runner-2d": {
+      "sha256": "87f0b559261215b53954ab1c681fa7afcf2f2a5e217841056c5f6b53a73cc99a",
+      "bytes": 3534436
+    },
+    "save-girl-draw": {
+      "sha256": "ac1425e1c5733f0cba5353cfe7277da820b7a308931767bce42003ac8a62e516",
+      "bytes": 8073739
+    },
+    "save-the-chick": {
+      "sha256": "d8e01e48403776f3233443a4b0a0d340850d1503c6d0243a54a238f99bfd66c5",
+      "bytes": 3229758
+    },
+    "save-the-dog": {
+      "sha256": "90aab0a697aaa84f52a49573fa05c9a2f48bd727b10786a3bd9439cedf432ac5",
+      "bytes": 7603860
+    },
+    "save-the-pets": {
+      "sha256": "06eea9057f550205b5e9eef98479d1c245cd2b7d2613d85196356dbe8b1f018a",
+      "bytes": 17010994
+    },
+    "school-tycoon-3d": {
+      "sha256": "115057f5a88fb95022aa6f5232575923a5d4f53c812894c295e18ff4549e3ce3",
+      "bytes": 76813701
+    },
+    "screw-puzzle": {
+      "sha256": "e53c6b95e71133212e51f586d6702c150ce6c7e96ffbd9c60d6bed16f6964be6",
+      "bytes": 3497284
+    },
+    "shaman-block-pop": {
+      "sha256": "0e91235b12ca419afe26d4e1c6498379d3799db009cbdb8178cfb0d9dc27af51",
+      "bytes": 3758287
+    },
+    "shanghai-vice": {
+      "sha256": "0bb7c752aa91c765a7d14a078a11c41ed7b33e060963a89dbfdb0d2ea9f42538",
+      "bytes": 24256982
+    },
+    "sheep-farm-tycoon": {
+      "sha256": "41b5cb2b3ce188cfe92a863f2190ffc6f4a5aa1806b06c16633cac163ed7fdd1",
+      "bytes": 5454072
+    },
+    "snow-dash-runner": {
+      "sha256": "fc1362747a565aa7c8a62b2dddad2425795c1b8a36fcf00ab16c58efc6c64083",
+      "bytes": 12744506
+    },
+    "snowball-rush-io": {
+      "sha256": "d063e744b0768c04b263daa3113e6fbe6001e7c9b95b5b9d5642655e1370ca5c",
+      "bytes": 1932938
+    },
+    "soccer-blitz-2d": {
+      "sha256": "cd19ca1ec0112a605401f5e036caae8eebb5c767f575baaf809c25786c8cb1c6",
+      "bytes": 24182736
+    },
+    "space-pinball-neon": {
+      "sha256": "436db69bb277c195825ed6a528cc13461f9fbc9b396b04030ebb9e0dee3e5d39",
+      "bytes": 3556353
+    },
+    "squirrel-brawl-2d": {
+      "sha256": "c558b09f478ab1e23acdb5c99393d129e1d9f7591fba56345adb1d83cf696cdd",
+      "bytes": 3552813
+    },
+    "star-escape-3d": {
+      "sha256": "a269c997c77fca762003957fd8fc5c6dbbf20410da3fff45b1bb907948f7a034",
+      "bytes": 9743902
+    },
+    "star-frontier-war": {
+      "sha256": "e38883ec1176d2febe047ef80e0afc287c45dcec083735a8baef63dfee08da24",
+      "bytes": 8800819
+    },
+    "stay-in-the-bowl": {
+      "sha256": "828102b0de6cc1acbac4d2f4c7cd087c3f297cfc3a9720ec61590ec8646f1594",
+      "bytes": 2989804
+    },
+    "stick-soccer-duel": {
+      "sha256": "7e7a6ec93e5d31c955cdccadc4d5791c7e3b48a8f73f200167bcf797a4a32c0e",
+      "bytes": 10224497
+    },
+    "stickman-3kingdoms": {
+      "sha256": "4d73807bfb605539744887027517de4b7398f90025cedf05ca6ad96e6a52d9be",
+      "bytes": 13885284
+    },
+    "stickman-sniper-pro": {
+      "sha256": "abc471ac47650a9ce7fae62f8009841612a6ada2b07a278b4eb61deecd5ccd1f",
+      "bytes": 10223527
+    },
+    "super-stress-box": {
+      "sha256": "74dc10f098ed94f51674c3c7c8562630c103e9217d5d5f0d90b357617a2be0dd",
+      "bytes": 2239164
+    },
+    "supermarket-tycoon": {
+      "sha256": "274a8621ed6c0a4fd9077bae31edb70d10e8959a88128af257d0308c3e8d5f1b",
+      "bytes": 20059189
+    },
+    "sweet-princess-dress": {
+      "sha256": "3fe24955a4d8f7a51cc6be2c1af8f692f35015c61600ae02b7c6af9629c2c941",
+      "bytes": 14198571
+    },
+    "tank-drift-ace": {
+      "sha256": "ec8b0270e8285f3c4e4d6c925fbe5199d9fbc209bc35889000fefe5bbb8a87a7",
+      "bytes": 2339851
+    },
+    "target-range-shot": {
+      "sha256": "ca1d62eeb0a6e792090c569afb861dea62ac9b9175e4a24ab53b4a3deaaf8270",
+      "bytes": 2664297
+    },
+    "tetris-blast-boom": {
+      "sha256": "b9ce2634dc3b8539891ffb3531daafa44c9b142ec16f73af0febedd6acbac52d",
+      "bytes": 8066183
+    },
+    "tetris-classic-pro": {
+      "sha256": "93946c17cc3f32918f48f355f9fd636795acdd17ad2edecd562ce854c81c0100",
+      "bytes": 3153989
+    },
+    "three-kingdoms-cmd": {
+      "sha256": "db88cf060f2c18eb98ed1af33be49e31fc48420d3cc125b4691ba10dcfe42bb7",
+      "bytes": 12890399
+    },
+    "thumb-pinball-pop": {
+      "sha256": "a2416b2a93c240ffbc331e5dfc947be52582f324b8cd87c4a920ae0956a6b30f",
+      "bytes": 3561756
+    },
+    "tile-stack": {
+      "sha256": "c082779cc2b1d89d58bf74558128636aa1d486361e6307316a579ac70eb25da3",
+      "bytes": 1480364
+    },
+    "tiny-hero-quest": {
+      "sha256": "de862111cdb927c59ab77a6aabb5f074329537c9f2a89fa8a44e628d5f8d13a4",
+      "bytes": 6229541
+    },
+    "tiny-war-commander": {
+      "sha256": "9da3feff42ef287ad03ba86747d674436378609506cf8ec54b34e8a09e32926c",
+      "bytes": 20871971
+    },
+    "tofu-princess-jump": {
+      "sha256": "2cfc5e2e3b17d055715573c9b3f5d37e959887fcae6e5b5122d4eca57914395d",
+      "bytes": 7289330
+    },
+    "totoro-magic-tale": {
+      "sha256": "279da8c10abdfdb44df17dc8911e8766e766ff4cfc55e7c14b43cadfd912b841",
+      "bytes": 7287300
+    },
+    "tower-defense-heroes": {
+      "sha256": "ed1e371bf50c6b03a6b34a50e3a5f24fa03c3f1dd84f4c9d4aa02c60be26d15c",
+      "bytes": 14279915
+    },
+    "tower-stack-3d": {
+      "sha256": "b33d5c2f01cce289be789c3b3959a779529238ae217c920b09b5ca90c167a123",
+      "bytes": 7524702
+    },
+    "tribal-jungle-run": {
+      "sha256": "8182ba854419d0bf4a11f926a85a0053b915ae2bdf1d566811d5b0b0076955f7",
+      "bytes": 7479817
+    },
+    "turbo-hero-run": {
+      "sha256": "2921275a0aa05ab602826b98fa24c4f174270edb8965c568fa88ff21920ee933",
+      "bytes": 12860870
+    },
+    "two-player-party": {
+      "sha256": "610c4f3c4f850ca2b9682b4b262e7cffa49429c75734f19a0f05f213697966ef",
+      "bytes": 3589010
+    },
+    "ultimate-stress-box": {
+      "sha256": "8be3ec4d5c6ced9eb76810b4f91f0e64280f0e8a0c4cdae4962942f2e003fec3",
+      "bytes": 3394157
+    },
+    "unbolt-escape-jam": {
+      "sha256": "66fc28ea25283a7cbdccfb3610018b5c058f7f175e3941277e76c0fcf5df6960",
+      "bytes": 2637259
+    },
+    "unbolt-screw-51": {
+      "sha256": "b93c09a68b0d8adccb8f252da8a1a1e0b07d877499c712e3c93362e35ba135d6",
+      "bytes": 3010218
+    },
+    "vice-beach-golf-club": {
+      "sha256": "ee83c8ddf2a3655d855d04c46121a4f73642b2579c7d63a9dc50526691ace52f",
+      "bytes": 1878709
+    },
+    "vice-beach-motor-club": {
+      "sha256": "49c64c08bc170304a55c29c555cf7bae410fffbc4f071a49644df9dfb5c498a8",
+      "bytes": 836374
+    },
+    "video-jigsaw": {
+      "sha256": "2d2da86ee3a4d34eb2778333bec8f67da70aff8eeac41d5cd51f633f5ce41afe",
+      "bytes": 8663778
+    },
+    "village-defense": {
+      "sha256": "a7ba23fcf9473b1bd1affd0d2921840279a67f22903359de65103992ca1cedfe",
+      "bytes": 9368000
+    },
+    "village-guard-td": {
+      "sha256": "a7b4d1da8c8ae6222b94f10e3ce45c10979cb55f7b6007b07b5d4b80103a5bbc",
+      "bytes": 5078449
+    },
+    "vita-mahjong-pairs": {
+      "sha256": "d21bab63e38aaced22be38889c2524262216a7bc06c959e406e3c983f641c1ed",
+      "bytes": 8905669
+    },
+    "water-sort-puzzle": {
+      "sha256": "12f6419ec4c929a0e866c5f1a57de1cfb1337e3e8568f9328bc922e26330ed6b",
+      "bytes": 7562235
+    },
+    "watermelon-merge-3d": {
+      "sha256": "37d8c489b0db902aa738ae52ef854907b784192262e2a9c32f15a0c209c6890c",
+      "bytes": 8360468
+    },
+    "whack-a-mole-2d": {
+      "sha256": "13553bab92e9ba98be06bdcfb18f967a39af0e995b8e2997b1c234c4f1af92cc",
+      "bytes": 5905512
+    },
+    "wild-brain-meme": {
+      "sha256": "45d94252a41527d0a3728de6d15a0b1086d77de13f4881fb3baf5ac5dd1938b4",
+      "bytes": 13585599
+    },
+    "winter-skydive-3d": {
+      "sha256": "9589745832b66278bc682f95bbd5de015593c077fcadfe785a9b84d8559ddfde",
+      "bytes": 6416014
+    },
+    "wooden-puzzle-pack": {
+      "sha256": "c35611bba78a8dafa293a97f017da06cdc72fdfce131be30a4bcd92761497da0",
+      "bytes": 6406198
+    },
+    "word-card-sort": {
+      "sha256": "e11140cfcec2cd859255b9d91b481d9b2026a2b1dbab988e40deffd42cf1403f",
+      "bytes": 7736986
+    },
+    "word-tower-defense": {
+      "sha256": "66b0c6d07d86b6750c64c14baa9bcae667010ecd68b490b322705cf1c9fe93bc",
+      "bytes": 8041203
+    },
+    "xiangqi-endgame-pro": {
+      "sha256": "07126dc3a650591d21bb949caaaeed89e830e594a9b25c24aa78930741b755d4",
+      "bytes": 4442782
+    },
+    "yarn-sort-color": {
+      "sha256": "936a22d3e913966a10c973d1f1fe8753c602e3ff8d9e494c076d38e44810494e",
+      "bytes": 7878256
+    },
+    "zombie-siege-3d": {
+      "sha256": "ac47ebd97989ecad1ab2bf82f654289fea9dcc6685feb3969ba67e11437ba891",
+      "bytes": 21812218
+    },
+    "zuma-marble-blast": {
+      "sha256": "9e7340ad6778a3ff03964783a6be81b1554dcbf0a889b0e1b7d466d1f2d5fb4e",
+      "bytes": 9391876
+    }
+  }
+}

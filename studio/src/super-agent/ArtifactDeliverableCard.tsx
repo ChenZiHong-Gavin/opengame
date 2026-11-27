@@ -12,6 +12,8 @@ import { designClient } from '../design/designClient';
 import { useI18n } from '../i18n/I18n';
 import { RemixIcon } from '../icons/RemixIcons';
 import { modelDisplayLabel } from '../motion/generationLabels';
+import { buildGamePublishOpenInput, resolveGameCloudTarget, resolvePublishableGameId } from './gamePublish/gamePublishEntry';
+import { gamePublishActions, useGamePublishSession } from './gamePublish/gamePublishStore';
 
 export type DeliverableTone = 'agent' | 'coding' | 'image' | 'video' | 'audio';
 
@@ -126,15 +128,8 @@ export function artifactDeliverableMeta(artifact: SuperAgentArtifact): ArtifactD
 
 export function resolveArtifactCloudTarget(artifact: SuperAgentArtifact): ArtifactCloudTarget | null {
   if (artifact.kind === 'game-project') {
-    const targetId = artifact.projectId || (artifact.id.startsWith('game:') ? artifact.id.slice('game:'.length) : '');
-    if (!targetId) return null;
-    if (artifact.projectId) {
-      return { targetKind: 'game', targetId, filePath: artifact.entry };
-    }
-    if (artifact.url && /^https:\/\//i.test(artifact.url)) {
-      return { targetKind: 'game', targetId, embedUrl: artifact.url };
-    }
-    return null;
+    const gameTarget = resolveGameCloudTarget(artifact);
+    return gameTarget ? { targetKind: 'game', ...gameTarget } : null;
   }
   if (artifact.kind === 'design-project' && artifact.projectId) {
     return { targetKind: 'design', targetId: artifact.projectId, filePath: artifact.entry };
@@ -271,6 +266,7 @@ const WEB_EXPORT_OPTIONS: { format: DesignExportFormat; label: string; icon: str
 
 export type ArtifactDeliverableCardProps = {
   artifact: SuperAgentArtifact;
+  chatId?: string | null;
   layout?: 'default' | 'hero';
   isActiveInViewer?: boolean;
   onOpenArtifactId: (artifactId: string) => void;
@@ -329,6 +325,7 @@ function buildCoverCandidates(artifact: SuperAgentArtifact): string[] {
 
 export function ArtifactDeliverableCard({
   artifact,
+  chatId = null,
   layout = 'default',
   isActiveInViewer = false,
   onOpenArtifactId,
@@ -364,6 +361,10 @@ export function ArtifactDeliverableCard({
         ? (orientationTag ? `${t(meta.typeLabel)} · ${subDetail} · ${orientationTag}` : `${t(meta.typeLabel)} · ${subDetail}`)
         : (orientationTag ? `${t(meta.typeLabel)} · ${orientationTag}` : t(meta.typeLabel));
   const cloudTarget = resolveArtifactCloudTarget(artifact);
+  // Game publish wizard: only local workspace game projects can be packaged/published to platforms.
+  const publishGameId = resolvePublishableGameId(artifact);
+  const publishSession = useGamePublishSession(publishGameId ? artifact.id : null);
+  const publishPanelOpen = Boolean(publishGameId && isActiveInViewer && publishSession?.open);
 
   const coverCandidates = buildCoverCandidates(artifact);
   const thumbUrl = coverCandidates[coverIdx] ?? null;
@@ -385,6 +386,18 @@ export function ArtifactDeliverableCard({
   const isDeckDesign = artifact.kind === 'design-project'
     && (artifact.scenario === 'deck' || artifact.scenario === 'document');
   const designExportOptions = isDeckDesign ? DECK_EXPORT_OPTIONS : WEB_EXPORT_OPTIONS;
+
+  const handleToggleGamePublish = () => {
+    if (!publishGameId) return;
+    if (publishPanelOpen) {
+      gamePublishActions.close(artifact.id);
+      return;
+    }
+    const input = buildGamePublishOpenInput(artifact, { chatId });
+    if (!input) return;
+    gamePublishActions.open(input);
+    onOpenArtifactId(artifact.id);
+  };
 
   const handleGameExport = async () => {
     if (!artifact.projectId || exportBusy) return;
@@ -478,6 +491,20 @@ export function ArtifactDeliverableCard({
         <RemixIcon name={primaryIcon} size={13} />
         <span>{primaryLabel}</span>
       </Button>
+
+      {publishGameId && (
+        <Button
+          variant="plain"
+          type="button"
+          className="om-sa-deliverable-btn om-sa-deliverable-publish-btn"
+          data-active={publishPanelOpen || undefined}
+          aria-pressed={publishPanelOpen}
+          onClick={handleToggleGamePublish}
+        >
+          <RemixIcon name="upload-2-line" size={13} />
+          <span>{t('Publish')}</span>
+        </Button>
+      )}
 
       {cloudTarget && (
         <WebPublishPopover

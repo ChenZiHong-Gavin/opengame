@@ -155,7 +155,7 @@ export function GamePublishPanel({ artifactId, coverUrl, onChooseDouyin, onNotif
  */
 function OpenDesignChoice({ session, onNotify }: { session: GamePublishSession; onNotify?: Notify }) {
   const { locale, t } = useI18n();
-  const { account, signedIn, authorizing, signingIn, startSignIn: startPanelSignIn } = useOpenDesignPublishSignIn(session.artifactId, onNotify);
+  const { account, signedIn, authorizing, signingIn, startSignIn: startPanelSignIn } = useOpenDesignPublishSignIn(session.artifactId, onNotify, 'game_publish_panel_signin', false);
   const campaign = useBlackFridayActive();
   const [upgradeEntryId, setUpgradeEntryId] = useState(newCampaignEntryId);
   const markCheckoutReturn = useCheckoutReturnRefresh('creative_studio', 'game_publish_unlisted_upgrade');
@@ -197,7 +197,7 @@ function OpenDesignChoice({ session, onNotify }: { session: GamePublishSession; 
     window.setTimeout(() => setUpgradeEntryId(newCampaignEntryId()), 0);
   }
 
-  const upgradeHref = campaignPricingUrl(locale, 'opengame_publish_unlisted', upgradeEntryId);
+  const upgradeHref = campaignPricingUrl(locale, 'opengame_publish_unlisted', upgradeEntryId, { studioId: 'game', modality: 'all' });
 
   return (
     <div className="om-gp-od-block">

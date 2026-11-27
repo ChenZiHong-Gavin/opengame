@@ -10,7 +10,7 @@ import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { GameProjects } from '../game-projects.ts';
-import { buildGameTemplateBundles } from '../scripts/game-template-publication.ts';
+import { buildGameTemplateBundles, checkGameDownloadIndex } from '../scripts/game-template-publication.ts';
 import { HostedGameTemplates, defaultLfsBatchUrl, gameBundleUrl, lfsBatchUrlFromRemote } from '../shared/hosted-game-templates.ts';
 
 const execGit = promisify(execFile);
@@ -269,4 +269,57 @@ test('GameProjects play and remix work from a source snapshot without .git or gi
   const draft = await studio.remix('selected');
   assert.equal((await studio.staticFile(draft.game.id, 'asset.bin')).data.toString(), 'snapshot asset payload');
   assert.equal(requests.length, 2);
+});
+
+test('mixed in-repo and card-only R2-hosted game templates validate and merge cleanly', async t => {
+  const root = await mkdtemp(path.join(tmpdir(), 'opengame-mixed-hosted-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const templates = path.join(root, 'templates/games');
+  const indexPath = path.join(root, 'templates/game-downloads.json');
+
+  // Build one real archive first to get an authentic sha256 + byte length lock for the card-only hosted game.
+  const origin = path.join(root, 'origin');
+  await mkdir(path.join(origin, 'hosted-one'), { recursive: true });
+  await writeFile(path.join(origin, 'hosted-one/game.json'), JSON.stringify({ id: 'hosted-one', title: 'Hosted One', description: 'Demo', genre: 'casual', multiplayer: false, status: 'published', cover: 'cover.webp' }));
+  await writeFile(path.join(origin, 'hosted-one/cover.webp'), 'poster-hosted');
+  await writeFile(path.join(origin, 'hosted-one/index.html'), '<p>Hosted</p>');
+  const builtOrigin = await buildGameTemplateBundles(origin);
+
+  // Set up mixed checkout: tidebreaker (offline), local-one (in-repo source), hosted-one (card-only + R2 lock).
+  for (const id of ['tidebreaker', 'local-one', 'hosted-one']) {
+    await mkdir(path.join(templates, id), { recursive: true });
+    await writeFile(path.join(templates, id, 'game.json'), JSON.stringify({ id, title: id, description: 'Demo', genre: 'casual', multiplayer: false, status: 'published', cover: 'cover.webp' }));
+    await writeFile(path.join(templates, id, 'cover.webp'), `poster-${id}`);
+  }
+  await writeFile(path.join(templates, 'tidebreaker/index.html'), '<p>Offline</p>');
+  await writeFile(path.join(templates, 'local-one/index.html'), '<p>Local</p>');
+  await writeFile(indexPath, JSON.stringify({ schemaVersion: 1, games: { 'hosted-one': builtOrigin['hosted-one'] } }));
+
+  const summary = await checkGameDownloadIndex(templates, indexPath);
+  assert.deepEqual(summary.sourceIds, ['local-one', 'tidebreaker']);
+  assert.deepEqual(summary.hostedIds, ['hosted-one']);
+
+  const publishedLocal: string[] = [];
+  const verifiedHosted: string[] = [];
+  const merged = await buildGameTemplateBundles(
+    templates,
+    async (lock) => { publishedLocal.push(lock.sha256); },
+    { verifyHosted: async (_lock, id) => { verifiedHosted.push(id); } },
+  );
+  assert.deepEqual(Object.keys(merged).sort(), ['hosted-one', 'local-one']);
+  assert.deepEqual(merged['hosted-one'], builtOrigin['hosted-one']);
+  assert.equal(publishedLocal.length, 1);
+  assert.deepEqual(verifiedHosted, ['hosted-one']);
+
+  // Shadowing an in-repo game in game-downloads.json must fail.
+  await writeFile(indexPath, JSON.stringify({ schemaVersion: 1, games: { 'hosted-one': builtOrigin['hosted-one'], 'local-one': merged['local-one'] } }));
+  await assert.rejects(checkGameDownloadIndex(templates, indexPath), /must not be shadowed/);
+
+  // Missing lock for a card-only game must fail.
+  await writeFile(indexPath, JSON.stringify({ schemaVersion: 1, games: {} }));
+  await assert.rejects(checkGameDownloadIndex(templates, indexPath), /missing from game-downloads\.json/);
+
+  // Orphan lock without a card folder must fail.
+  await writeFile(indexPath, JSON.stringify({ schemaVersion: 1, games: { 'hosted-one': builtOrigin['hosted-one'], ghost: builtOrigin['hosted-one'] } }));
+  await assert.rejects(checkGameDownloadIndex(templates, indexPath), /Orphan entry/);
 });

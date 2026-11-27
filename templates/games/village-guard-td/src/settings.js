@@ -1,1 +1,0 @@
-window._CCSettings={platform:"web-mobile",groupList:["default","ttq","xian","zaw"],collisionMatrix:[[true,true,false,true],[true,false,true,true],[false,true,false],[true,true,false,true]],hasResourcesBundle:true,hasStartSceneBundle:false,remoteBundles:[],subpackages:[],launchScene:"db:/"+"/assets/sences/game.fire",orientation:"portrait",jsList:[]};

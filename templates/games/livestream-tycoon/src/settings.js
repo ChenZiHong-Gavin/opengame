@@ -1,1 +1,0 @@
-window._CCSettings={platform:"web-mobile",groupList:["default","draw"],collisionMatrix:[[true],[false,false]],hasResourcesBundle:true,hasStartSceneBundle:false,remoteBundles:[],subpackages:[],launchScene:"db:/"+"/assets/MainPackage/scene_start.fire",orientation:"portrait",jsList:["rich-plugin/richlib/richcreatorlib.min.js"]};

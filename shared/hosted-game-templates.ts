@@ -349,7 +349,7 @@ export function gameBundleUrl(hash: string) {
   return `${mediaOrigin}/${gameBundlePrefix}${hash}.zip`;
 }
 
-/** The npm application pins its own index. Source checkouts and full ZIPs have no index. */
+/** Hosted games pinned in game-downloads.json download immutable verified bundles on demand; local source games use the checkout directly. */
 export class HostedGameTemplates {
   private index?: Promise<GameDownloadIndex>;
   private pending = new Map<string, Promise<string>>();
@@ -412,7 +412,9 @@ export class HostedGameTemplates {
       ready = this.materialize(id, bundle, url).finally(() => this.pending.delete(bundle.sha256));
       this.pending.set(bundle.sha256, ready);
     }
-    return ready;
+    const resolved = await ready;
+    this.sourceResolved.set(installed, resolved);
+    return resolved;
   }
 
   private async materialize(id: string, bundle: GameBundle, url: string) {

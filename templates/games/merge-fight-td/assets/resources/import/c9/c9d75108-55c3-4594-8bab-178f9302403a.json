@@ -1,1 +1,0 @@
-[1,0,0,[["cc.TextAsset",["_name","text"],1]],[[0,0,1,3]],[[0,"event",",备注,事件条件,条件参数,事件执行,事件执行参数,目标类型,目标参数\nid：number,,evtCond:inttable,evtCondArg:table,evtExcute:number,evtExcuteArgs:table,evtTargetType:number,evtTargetArgs:table\n1000,有60%概率爆头,1,60,2,,1,\n1001,增加射击速度,0,,3,100,1,\n1002,增加黄色塔攻击范围,2,100,3,101,,\n"]],0,0,[],[],[]]

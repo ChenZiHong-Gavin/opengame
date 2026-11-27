@@ -2240,6 +2240,7 @@ export function ExecutionTimeline({
                         <ArtifactDeliverableCard
                           key={artifact.id}
                           artifact={artifact}
+                          chatId={chat.id}
                           layout={useHeroSingleLayout ? 'hero' : 'default'}
                           isActiveInViewer={Boolean(activeViewerArtifactId && activeViewerArtifactId === artifact.id)}
                           onOpenArtifactId={onOpenArtifactId}
@@ -2657,12 +2658,16 @@ function GateActionCard({
       );
     }
     if (isTopUp) {
+      const clickedId = entryId;
       openBalanceGate({
         reason: 'insufficient_balance',
         pageName: 'creative_studio',
         studioId: 'game',
+        entryId: clickedId,
+        hookId: hookId ?? 'failure_card_topup',
         ...(onResume ? { onRecovered: () => onResume(card, { key: handoffKey ?? card.id }) } : {}),
       });
+      setEntryId(newCampaignEntryId());
       return;
     }
     onTrigger?.(card);
@@ -2681,7 +2686,7 @@ function GateActionCard({
         <a
           className="om-sa-deliverable-btn om-sa-action-card-btn"
           data-primary
-          href={campaignPricingUrl(locale, 'opengame_agent_upgrade', entryId)}
+          href={campaignPricingUrl(locale, 'opengame_agent_upgrade', entryId, { studioId: 'game', modality: 'all' })}
           target="_blank"
           rel="noopener noreferrer"
           aria-describedby={descriptionId}

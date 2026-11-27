@@ -219,7 +219,7 @@ function PackageStep({ session, stepRef }: { session: GamePublishSession; stepRe
 /** Step that needs the real OpenDesign link (Telegram). */
 function LinkStep({ session, onNotify }: { session: GamePublishSession; onNotify?: Notify }) {
   const { t } = useI18n();
-  const { account, signedIn, authorizing, signingIn, startSignIn } = useOpenDesignPublishSignIn(session.artifactId, onNotify);
+  const { account, signedIn, authorizing, signingIn, startSignIn } = useOpenDesignPublishSignIn(session.artifactId, onNotify, 'game_publish_telegram_signin', !session.linkUrl);
   if (session.linkUrl) {
     return (
       <div className="om-gp-checks">

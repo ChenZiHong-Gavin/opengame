@@ -646,11 +646,14 @@ it('renders Super Agent empty home, opens Resource Picker, and applies selected 
   });
   await flush();
 
-  expect(document.body.textContent).toContain('What can I create for you?');
+  expect(document.body.textContent).toContain('What would you like to create today?');
   expect(container.querySelector('.om-sa-home-hero + .om-sa-starter-grid')).toBeTruthy();
-  expect(container.querySelector('.om-sa-stream > .om-sa-messages + .om-sa-composer-placement .om-sa-composer-editor')).toBeTruthy();
+  expect(container.querySelector('.om-sa-stream > .om-sa-stream-head')).toBeTruthy();
+  expect(container.querySelector('.om-sa-messages + .om-sa-composer-placement .om-sa-composer-editor')).toBeTruthy();
+  expect(container.querySelector('.om-sa-home canvas')).toBeNull();
+  expect(container.querySelector('.om-sa-home')?.textContent).not.toContain('My creations');
   expect([...container.querySelectorAll('.om-sa-starter-card strong')].map(node => node.textContent)).toEqual([
-    'Build a game', 'Design Studio', 'Motion graphics', 'Make a video', 'Create slides', 'Explore more',
+    'Anyone can build games that earn.', 'Design Studio', 'Make a video', 'Create slides', 'Explore more',
   ]);
 
   // No standalone Resources entry button in the stream header
@@ -3482,7 +3485,7 @@ it.each([
   );
   expect(createCalls).toHaveLength(0);
   expect(onChatIdChange).toHaveBeenCalledWith(null);
-  expect(document.body.textContent).toContain('What can I create for you?');
+  expect(document.body.textContent).toContain('What would you like to create today?');
   expect(document.querySelector('.om-sa-viewer')).toBeNull();
 });
 
@@ -7497,7 +7500,7 @@ it('clamps out-of-range bounded numeric SSOT parameters on blur and emits clampe
   expect(turnBodies[0]?.hiddenInstructions).toContain('"num_frames":161');
 });
 
-it('exposes Motion graphics as a primary entry, moves Create audio into Explore more, and separates AI Video vs Motion Graphics templates', async () => {
+it('keeps Motion graphics inside video creation and separates its templates from AI Video', async () => {
   setupDesignStudioMocks({ extraVideoAssets: 24, assetPageFailures: 1 });
   const flushMore = async () => {
     await flush();
@@ -7533,12 +7536,16 @@ it('exposes Motion graphics as a primary entry, moves Create audio into Explore 
   await act(async () => moreBtn.click());
   await flush();
 
-  // 2) Clicking Motion graphics opens Video mode on the Motion graphics engine with pure Motion Graphics templates
-  const motionStarter = [...container.querySelectorAll('.om-sa-starter-card')].find(
-    el => el.textContent?.includes('Motion graphics'),
-  ) as HTMLButtonElement;
-  expect(motionStarter).toBeTruthy();
-  await act(async () => motionStarter.click());
+  // Motion graphics remains available through the engine picker in video mode.
+  expect(container.querySelector('.om-sa-starter-grid')?.textContent).not.toContain('Motion graphics');
+  await act(async () => ([...container.querySelectorAll<HTMLButtonElement>('.om-sa-starter-card')]
+    .find(el => el.textContent?.includes('Make a video'))!).click());
+  await flushMore();
+  await act(async () => ([...container.querySelectorAll<HTMLButtonElement>('.om-sa-composer-top-bar button')]
+    .find(el => el.textContent?.includes('AI Video'))!).click());
+  await flush();
+  await act(async () => ([...document.querySelectorAll<HTMLButtonElement>('.om-sa-popover-pill')]
+    .find(el => el.textContent?.includes('Motion graphics'))!).click());
   await flushMore();
 
   expect(container.querySelector('.om-sa-composer-top-bar')?.textContent).toContain('Motion graphics');

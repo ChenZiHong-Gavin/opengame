@@ -69,7 +69,17 @@ async function mapConcurrent<T>(items: T[], concurrency: number, worker: (item: 
   await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => next()));
 }
 
-export async function checkGameDownloadIndex(root: string, indexPath = path.join(root, '..', 'game-downloads.json')) {
+export type GameTemplatePlan = {
+  entries: string[];
+  sourceIds: string[];
+  hostedIds: string[];
+  hosted: Record<string, GameBundle>;
+};
+
+export async function planGameTemplates(
+  root: string,
+  indexPath = path.join(root, '..', 'game-downloads.json'),
+): Promise<GameTemplatePlan> {
   const hosted = await readGameDownloadIndex(indexPath);
   const entries = (await readdir(root)).filter(id => !id.startsWith('.')).sort();
   const entrySet = new Set(entries);
@@ -98,7 +108,11 @@ export async function checkGameDownloadIndex(root: string, indexPath = path.join
       hostedIds.push(id);
     }
   }
-  return { sourceIds, hostedIds, hosted };
+  return { entries, sourceIds, hostedIds, hosted };
+}
+
+export async function checkGameDownloadIndex(root: string, indexPath = path.join(root, '..', 'game-downloads.json')) {
+  return planGameTemplates(root, indexPath);
 }
 
 export async function buildGameTemplateBundles(
@@ -107,29 +121,19 @@ export async function buildGameTemplateBundles(
   options: BuildGameTemplateBundlesOptions = {},
 ) {
   const indexPath = options.indexPath ?? path.join(root, '..', 'game-downloads.json');
-  const hosted = await readGameDownloadIndex(indexPath);
+  const { entries, hostedIds, hosted } = await planGameTemplates(root, indexPath);
+  const hostedSet = new Set(hostedIds);
   const games: Record<string, GameBundle> = Object.create(null);
-  const entries = (await readdir(root)).filter(id => !id.startsWith('.')).sort();
-  const entrySet = new Set(entries);
-  for (const id of Object.keys(hosted)) {
-    assert(entrySet.has(id), `Orphan entry in game-downloads.json without templates/games/${id}: ${id}`);
-  }
   const hostedToVerify: [string, GameBundle][] = [];
   for (const id of entries) {
     if (id === offlineGame) continue;
-    assert(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,100}$/.test(id));
-    const dir = path.join(root, id);
-    assert((await lstat(dir)).isDirectory());
-    const hasLocalIndex = await fileExists(path.join(dir, 'index.html'));
-    if (!hasLocalIndex) {
-      assert(Object.hasOwn(hosted, id), `Missing index.html and hosted lock in game-downloads.json: ${id}`);
-      await assertCardOnlyTemplate(root, id);
+    if (hostedSet.has(id)) {
       const lock = hosted[id];
       games[id] = lock;
       if (options.verifyHosted) hostedToVerify.push([id, lock]);
       continue;
     }
-    assert(!Object.hasOwn(hosted, id), `In-repo game with index.html must not be shadowed by game-downloads.json: ${id}`);
+    const dir = path.join(root, id);
     const fileEntries: { name: string; data: Buffer }[] = [];
     let total = 0;
     async function collect(prefix: string) {

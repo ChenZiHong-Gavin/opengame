@@ -8,6 +8,7 @@ import { releaseProfile } from '../shared/mcp-registry.ts';
 import { checkDesign } from './design-check.ts';
 import { checkI18n } from './check-i18n.ts';
 import { checkRouting } from './check-routing.ts';
+import { checkGameDownloadIndex } from './game-template-publication.ts';
 import { getWorkflow, markdownAnchors, markdownHrefs, workflowLinkAnchors, workflowRegistry, phase1WorkflowNames, packagedSkills } from '../shared/workflow.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -129,6 +130,7 @@ export async function check() {
     }
   }
   assert.match(await readFile(path.join(root, 'templates/index.html'), 'utf8'), /data-composition-id/);
+  await checkGameDownloadIndex(path.join(root, 'templates/games'), path.join(root, 'templates/game-downloads.json'));
   await checkI18n();
   await checkRouting();
   await checkDesign();

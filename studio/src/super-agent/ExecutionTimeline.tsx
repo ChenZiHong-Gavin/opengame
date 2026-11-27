@@ -169,11 +169,12 @@ function collectTurnFiles(workItems: SuperAgentMessage[]): SuperAgentFileOperati
   return [...byPath.values()];
 }
 
-function groupMessagesIntoTurns(chat: SuperAgentChat): TurnGroup[] {
-  const artifactsById = new Map(chat.artifacts.map(a => [a.id, a]));
+function splitMessagesIntoRawTurns(
+  messages: readonly SuperAgentMessage[] | undefined,
+): { user?: SuperAgentMessage; rest: SuperAgentMessage[] }[] {
+  if (!messages?.length) return [];
   const rawTurns: { user?: SuperAgentMessage; rest: SuperAgentMessage[] }[] = [];
-
-  for (const msg of chat.messages) {
+  for (const msg of messages) {
     if (msg.role === 'user') {
       rawTurns.push({ user: msg, rest: [] });
     } else {
@@ -181,6 +182,17 @@ function groupMessagesIntoTurns(chat: SuperAgentChat): TurnGroup[] {
       rawTurns[rawTurns.length - 1].rest.push(msg);
     }
   }
+  return rawTurns;
+}
+
+/** Shared turn count derived from ExecutionTimeline's exact turn-grouping rule. */
+export function countConversationTurns(messages: readonly SuperAgentMessage[] | undefined): number {
+  return splitMessagesIntoRawTurns(messages).length;
+}
+
+function groupMessagesIntoTurns(chat: SuperAgentChat): TurnGroup[] {
+  const artifactsById = new Map(chat.artifacts.map(a => [a.id, a]));
+  const rawTurns = splitMessagesIntoRawTurns(chat.messages);
 
   const claimedArtifactIds = new Set<string>();
   const chatIsRunning = chat.state === 'running' || chat.state === 'waiting';
@@ -1923,6 +1935,7 @@ export function ExecutionTimeline({
   onOpenInBrandKit,
   onApprove,
   onContinue,
+  renderTurnFooter,
 }: {
   chat: SuperAgentChat;
   busy: boolean;
@@ -1950,6 +1963,7 @@ export function ExecutionTimeline({
   onOpenInBrandKit?: (kitId?: string) => void;
   onApprove: (approvalId: string, accepted: boolean, alwaysAllow?: boolean) => void;
   onContinue?: () => void;
+  renderTurnFooter?: (turnIndex: number, isLastTurn: boolean) => ReactNode;
 }) {
   const { t, locale } = useI18n();
   const [localTurnFeedback, setLocalTurnFeedback] = useState<Record<string, SuperAgentTurnFeedback | null>>({});
@@ -2240,6 +2254,7 @@ export function ExecutionTimeline({
                         <ArtifactDeliverableCard
                           key={artifact.id}
                           artifact={artifact}
+                          chatId={chat.id}
                           layout={useHeroSingleLayout ? 'hero' : 'default'}
                           isActiveInViewer={Boolean(activeViewerArtifactId && activeViewerArtifactId === artifact.id)}
                           onOpenArtifactId={onOpenArtifactId}
@@ -2476,6 +2491,7 @@ export function ExecutionTimeline({
                 </>
               );
             })()}
+            {renderTurnFooter?.(idx, isLastTurn)}
           </div>
         );
       })}

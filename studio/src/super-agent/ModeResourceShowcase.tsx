@@ -35,6 +35,17 @@ import {
   localizedGameTitle,
   toGameResourceAttachment,
 } from '../motion/game/gameSuperAgent';
+import aaaCityArt from '../motion/game/hero-art/aaa-city.webp';
+import aaaFantasyArt from '../motion/game/hero-art/aaa-fantasy.webp';
+import aaaHorrorArt from '../motion/game/hero-art/aaa-horror.webp';
+import aaaMythArt from '../motion/game/hero-art/aaa-myth.webp';
+import aaaSpyArt from '../motion/game/hero-art/aaa-spy.webp';
+import aaaWuxiaArt from '../motion/game/hero-art/aaa-wuxia.webp';
+import moneyBallMatchArt from '../motion/game/hero-art/money-ball-match.webp';
+import moneyBlockBlastArt from '../motion/game/hero-art/money-block-blast.webp';
+import moneyCatchPiggyArt from '../motion/game/hero-art/money-catch-piggy.webp';
+import moneyScrewPuzzleArt from '../motion/game/hero-art/money-screw-puzzle.webp';
+import moneyTileStackArt from '../motion/game/hero-art/money-tile-stack.webp';
 import lunarRef from '../motion/scene-art/apollo-11.jpg';
 import speakerRoomRef from '../motion/scene-art/speaker-room.webp';
 import speakerStudioRef from '../motion/scene-art/speaker-studio.webp';
@@ -44,7 +55,9 @@ import { templateCollectionFacets, templatesInCollection, type TemplateCollectio
 import { aiTechnologyIndustry, purposeOrder } from '../motion/templateDiscoveryTaxonomy';
 import { useCoveredTemplates } from '../motion/useCoveredTemplates';
 import {
+  canChoosePlayableAd,
   designScenarioOptionsPatch,
+  isPlayableAd,
   RESEARCH_FORMAT_CHOICES,
   visualizationOptionsPatch,
   VIZ_TYPE_CHOICES,
@@ -408,6 +421,68 @@ function isVizTemplate(item: SuperAgentResourceAttachment): boolean {
     || isVizDashboardTemplate(item)
     || isVizChartOrDiagramTemplate(item)
     || isVizInfographicTemplate(item);
+}
+
+/**
+ * Game Studio hero themes, picked by the hero's mode switch: "money" is the money-making game
+ * (playable ad) option turned on, "epic" turned off. Each theme has its own headline, floating
+ * display cards; the template list below always shows every template.
+ */
+export type GameHeroTheme = 'money' | 'epic';
+export const GAME_HERO_TITLES: Record<GameHeroTheme, string> = {
+  money: 'Build games. Turn play into pay.',
+  epic: 'Make your next viral game.',
+};
+
+type HeroFloatCard = { id: string; src: string; focus?: string };
+/**
+ * Hero display cards, by slot: 0-5 around the headline (1, 3 and 5 portrait), 6 the large
+ * centerpiece above the switch. Money-making cards show popular viral templates (bundled art keeps the
+ * hero look stable when template covers change); viral-game cards are original key art
+ * generated for OpenDesign (no third-party game art) plus a 3D template. `focus` keeps the subject in frame.
+ */
+const MONEY_HERO_CARDS: ({ id: string; focus?: string; src?: undefined } | HeroFloatCard)[] = [
+  { id: 'ball-match', src: moneyBallMatchArt },
+  { id: 'block-blast', src: moneyBlockBlastArt },
+  { id: 'catch-piggy', src: moneyCatchPiggyArt },
+  { id: 'screw-puzzle', src: moneyScrewPuzzleArt },
+  { id: 'tile-stack', src: moneyTileStackArt, focus: '30% 50%' },
+  { id: 'catch-fish' },
+  { id: 'snow-dash-runner', focus: '50% 40%' },
+];
+const EPIC_HERO_CARDS: ({ id: string; focus?: string; src?: undefined } | HeroFloatCard)[] = [
+  { id: 'aaa-myth', src: aaaMythArt, focus: '45% 40%' },
+  { id: 'aaa-horror', src: aaaHorrorArt },
+  { id: 'daily-drift-3d' },
+  { id: 'aaa-wuxia', src: aaaWuxiaArt },
+  { id: 'aaa-fantasy', src: aaaFantasyArt, focus: '40% 45%' },
+  { id: 'aaa-spy', src: aaaSpyArt },
+  { id: 'aaa-city', src: aaaCityArt, focus: '50% 55%' },
+];
+
+/** Hero batch for a theme: money-making templates for "money", everything else for "epic". */
+export function gameHeroBatch(games: GameCard[], theme: GameHeroTheme): GameCard[] {
+  const batch = games.filter(game => isTopEarningGame(game) === (theme === 'money'));
+  return batch.length > 0 ? batch : games;
+}
+
+/** Resolve hero cards from the catalog; a missing template falls back to the next unused one in the batch. */
+export function gameHeroCards(games: GameCard[], theme: GameHeroTheme): HeroFloatCard[] {
+  const byId = new Map(games.filter(g => coverUrl(g)).map(g => [g.id, g]));
+  const spare = gameHeroBatch(games, theme).filter(g => coverUrl(g));
+  const used = new Set<string>();
+  const cards: HeroFloatCard[] = [];
+  for (const spec of theme === 'money' ? MONEY_HERO_CARDS : EPIC_HERO_CARDS) {
+    if (spec.src) {
+      cards.push(spec);
+      continue;
+    }
+    const game = byId.get(spec.id) ?? spare.find(g => !used.has(g.id));
+    if (!game) continue;
+    used.add(game.id);
+    cards.push({ id: game.id, src: coverUrl(game)!, focus: byId.has(spec.id) ? spec.focus : undefined });
+  }
+  return cards;
 }
 
 function vizTypeToFilter(type: VisualizationType): string {
@@ -928,6 +1003,8 @@ export function ModeResourceShowcase({
   const [designProjects, setDesignProjects] = useState<SuperAgentResourceAttachment[] | null>(null);
   const [designSkills, setDesignSkills] = useState<SuperAgentResourceAttachment[] | null>(null);
   const [gameCatalog, setGameCatalog] = useState<GameCard[]>(() => [...communityGames, ...bundledGames]);
+  // The hero waits for the full catalog so its curated cards don't flash fallback covers first.
+  const [gameCatalogSettled, setGameCatalogSettled] = useState(false);
   const [loadingKind, setLoadingKind] = useState<string | null>(null);
 
   const [activeFilter, setActiveFilter] = useState<string>('all');
@@ -936,9 +1013,6 @@ export function ModeResourceShowcase({
   const [gameQuery, setGameQuery] = useState('');
   const [gameSort, setGameSort] = useState<GameSort>('relevance');
   const [visibleCount, setVisibleCount] = useState(PAGE_BATCH_SIZE);
-  // Start the hero fan offset from the top waterfall row so both shelves don't open on the exact same cover.
-  const [fanIndex, setFanIndex] = useState(() => (communityGames.length + bundledGames.length > 3 ? 3 : 0));
-  const [fanPaused, setFanPaused] = useState(false);
   const [tabsOverflow, setTabsOverflow] = useState<{ start: boolean; end: boolean }>({ start: false, end: false });
   const gameTitleRef = useRef<HTMLDivElement>(null);
   const showcaseSectionRef = useRef<HTMLElement | null>(null);
@@ -964,64 +1038,39 @@ export function ModeResourceShowcase({
     target.scrollIntoView?.({ behavior, block: 'start' });
   };
 
-  const selectGameShortcut = (filter: string) => {
-    setActiveFilter(filter);
-    requestAnimationFrame(() => {
-      const tabs = tabsRef.current;
-      const selected = tabs?.querySelector('[aria-selected="true"]');
-      if (tabs && selected && tabs.scrollWidth > tabs.clientWidth) {
-        const strip = tabs.getBoundingClientRect();
-        const tab = selected.getBoundingClientRect();
-        const left = Math.min(0, tab.left - strip.left - 28) + Math.max(0, tab.right - strip.right + 28);
-        if (left !== 0) tabs.scrollBy?.({ left });
-      }
-      scrollToShowcase('game-title');
-    });
-  };
-
   const publishedGameTemplates = useMemo(
     () => gameCatalog.filter(g => g.source !== 'mine' && g.status === 'published'),
     [gameCatalog],
   );
-  const fannedGames = useMemo(
-    () => publishedGameTemplates.filter(g => Boolean(coverUrl(g))),
-    [publishedGameTemplates],
+  // The hero follows the money-making option; a community template no longer flips it (see isPlayableAd). While a built-in template is attached the option does not apply, so the hero keeps
+  // the theme it showed when that template was picked.
+  const lastGameThemeRef = useRef<GameHeroTheme>('money');
+  const gameTheme: GameHeroTheme = !modeOptions
+    ? 'money'
+    : canChoosePlayableAd(modeOptions)
+      ? (isPlayableAd(modeOptions) ? 'money' : 'epic')
+      : lastGameThemeRef.current;
+  lastGameThemeRef.current = gameTheme;
+  const heroFloatCards = useMemo(
+    () => gameHeroCards(publishedGameTemplates, gameTheme),
+    [publishedGameTemplates, gameTheme],
   );
+  const switchGameTheme = (next: GameHeroTheme) => {
+    if (!onChangeModeOptions) return;
+    // An attached built-in template blocks the money-making option while the hero keeps showing it, so
+    // picking the shown mode still applies and drops that template.
+    const templateBlocksMode = Boolean(modeOptions && !canChoosePlayableAd(modeOptions));
+    if (next === gameTheme && !templateBlocksMode) return;
+    // Picking a mode also drops a template from the other batch.
+    onChangeModeOptions(next === 'money'
+      ? { gamePlayableAd: true, gameTemplate: null, ...(modeOptions?.gameOrientation === 'landscape' ? { gameOrientation: null } : {}) }
+      : { gamePlayableAd: false, gameTemplate: null });
+  };
   const myGames = useMemo(
     () => gameCatalog.filter(g => g.source === 'mine').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [gameCatalog],
   );
 
-  // Auto-rotate the fanned game showcase smoothly when visible and idle.
-  useEffect(() => {
-    if (!active || mode.id !== 'game' || fannedGames.length <= 1 || fanPaused) return;
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return;
-    }
-    const timer = window.setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      setFanIndex(prev => (prev + 1) % fannedGames.length);
-    }, 4500);
-    return () => window.clearInterval(timer);
-  }, [active, mode.id, fannedGames.length, fanPaused]);
-
-  const fanSlots = useMemo(() => {
-    const total = fannedGames.length;
-    if (total === 0) return [];
-    const center = ((fanIndex % total) + total) % total;
-    const maxOffset = Math.min(3, Math.floor((total - 1) / 2));
-    const offsets: number[] = [];
-    for (let d = -maxOffset; d <= maxOffset; d += 1) {
-      offsets.push(d);
-    }
-    if (total % 2 === 0 && maxOffset < 3) {
-      offsets.push(maxOffset + 1);
-    }
-    return offsets.map(offset => {
-      const idx = (center + offset + total) % total;
-      return { game: fannedGames[idx]!, index: idx, offset };
-    });
-  }, [fannedGames, fanIndex]);
 
   const isVideoMode = mode.id === 'motion' || mode.id === 'media';
   const isMotionGraphicsView =
@@ -1331,7 +1380,11 @@ export function ModeResourceShowcase({
         if (!cancelled && Array.isArray(res?.games)) {
           setGameCatalog([...communityGames, ...(res.games.length ? res.games : bundledGames)]);
         }
-      }).catch(() => { /* fallback keeps bundled + community games */ });
+        if (!cancelled) setGameCatalogSettled(true);
+      }).catch(() => {
+        // Fallback keeps bundled + community games.
+        if (!cancelled) setGameCatalogSettled(true);
+      });
     } else if (mode.id === 'image' && activeFilter === 'design-template') {
       void ensure('design-template');
     }
@@ -1590,7 +1643,20 @@ export function ModeResourceShowcase({
 
   return (
     <div className="om-sa-mode-showcase">
-      <div className="om-sa-mode-hero">
+      <div
+        className="om-sa-mode-hero"
+        data-game-theme={mode.id === 'game' ? gameTheme : undefined}
+        onPointerMove={mode.id === 'game' ? event => {
+          // Parallax for the floating game cards: pointer offset from the hero center, -1..1.
+          const rect = event.currentTarget.getBoundingClientRect();
+          event.currentTarget.style.setProperty('--hero-px', (((event.clientX - rect.left) / rect.width) * 2 - 1).toFixed(3));
+          event.currentTarget.style.setProperty('--hero-py', (((event.clientY - rect.top) / rect.height) * 2 - 1).toFixed(3));
+        } : undefined}
+        onPointerLeave={mode.id === 'game' ? event => {
+          event.currentTarget.style.setProperty('--hero-px', '0');
+          event.currentTarget.style.setProperty('--hero-py', '0');
+        } : undefined}
+      >
         {mode.id !== 'game' && (
           <div className="om-sa-mode-hero-close">
             <IconButton
@@ -1602,150 +1668,68 @@ export function ModeResourceShowcase({
             />
           </div>
         )}
-        {mode.id === 'game' && fanSlots.length > 0 ? (
-          <div
-            className="om-sa-game-fan"
-            role="region"
-            aria-roledescription="carousel"
-            aria-label={t('Game Studio')}
-            onMouseEnter={() => setFanPaused(true)}
-            onMouseLeave={() => setFanPaused(false)}
-            onFocusCapture={() => setFanPaused(true)}
-            onBlurCapture={event => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                setFanPaused(false);
-              }
-            }}
-            onKeyDown={event => {
-              if (fannedGames.length <= 1) return;
-              if (event.key === 'ArrowLeft') {
-                event.preventDefault();
-                setFanIndex(prev => (prev - 1 + fannedGames.length) % fannedGames.length);
-              } else if (event.key === 'ArrowRight') {
-                event.preventDefault();
-                setFanIndex(prev => (prev + 1) % fannedGames.length);
-              }
-            }}
-          >
-            {fannedGames.length > 1 && (
-              <IconButton
-                variant="plain"
-                type="button"
-                className="om-sa-game-fan-nav"
-                data-side="prev"
-                aria-label={t('Previous')}
-                onClick={() => setFanIndex(prev => (prev - 1 + fannedGames.length) % fannedGames.length)}
-                icon={<RemixIcon name="arrow-left-line" size={16} />}
-              />
-            )}
-            {fanSlots.map(({ game, index, offset }) => {
-              const title = localizedGameTitle(game, locale);
-              const cover = coverUrl(game);
-              const isSelected = modeOptions?.gameTemplate?.id === game.id;
-              const isPlaying = playingGameId === game.id;
-              const isCenter = offset === 0;
-              const isEdgeHidden = Math.abs(offset) > 2;
-              return (
-                <div
-                  key={game.id}
-                  className="om-sa-game-fan-item"
-                  data-slot={offset}
-                  data-center={isCenter || undefined}
-                  data-selected={isSelected || undefined}
-                  data-playing={isPlaying || undefined}
-                  aria-hidden={isEdgeHidden || undefined}
-                  inert={isEdgeHidden || undefined}
-                >
+        {mode.id === 'game' && heroFloatCards.length > 0 ? (
+          // Game hero: mode switch and a large headline, with that mode's games floating around it.
+          // The switch sets the money-making game option; the template list below stays the same.
+          <div className="om-sa-game-stage" data-theme={gameTheme}>
+            {onChangeModeOptions && (
+              <div className="om-sa-game-mode-switch" role="radiogroup" aria-label={t('Game type')} data-theme={gameTheme}>
+                <span className="om-sa-game-mode-thumb" aria-hidden="true" />
+                {(['money', 'epic'] as const).map(id => (
                   <Button
+                    key={id}
                     variant="plain"
                     type="button"
-                    className="om-sa-game-fan-card"
-                    aria-label={isCenter
-                      ? (onPlayGame ? t('Try game: {title}', { title }) : t('Play {title}', { title }))
-                      : title}
-                    disabled={isCenter && game.multiplayer && !onPlayGame}
-                    onPointerEnter={() => { if (isCenter) preconnectGame(game); }}
-                    onFocus={() => { if (isCenter) preconnectGame(game); }}
-                    onClick={() => {
-                      if (isCenter) playShowcaseGame(game);
-                      else setFanIndex(index);
-                    }}
+                    role="radio"
+                    aria-checked={gameTheme === id}
+                    data-active={gameTheme === id || undefined}
+                    className="om-sa-game-mode-option"
+                    onClick={() => switchGameTheme(id)}
                   >
-                    {cover && <img src={cover} alt="" />}
-                    {isTopEarningGame(game) && (
-                      <span className="om-sa-game-top-badge">
-                        <RemixIcon name="sparkling-fill" size={11} />
-                        <span>{TOP_EARNING_TAG}</span>
-                      </span>
-                    )}
-                    {isCenter && (
-                      <span
-                        className="om-sa-showcase-action-cue"
-                        data-playing={isPlaying || undefined}
-                        aria-hidden="true"
-                      >
-                        <RemixIcon name="play-fill" size={13} />
-                        <span>{isPlaying ? t('Playing') : t('Try game')}</span>
-                      </span>
-                    )}
-                    <span className="om-sa-game-fan-caption">
-                      <span className="om-sa-game-fan-label">{t(genreLabels[game.genre])}</span>
-                      {isCenter && <strong className="om-sa-game-fan-title">{title}</strong>}
-                    </span>
+                    <RemixIcon name={id === 'money' ? 'sparkling-fill' : 'gamepad-line'} size={14} />
+                    <span>{(id === 'money' ? t('Playable ad', undefined, 'game mode') : t('Viral game'))}</span>
                   </Button>
-                  {isCenter && (!game.multiplayer || onDeployGame) && (
-                    <div className="om-sa-game-tile-actions om-sa-game-fan-actions">
-                      {onDeployGame && (game.status === 'ready' || game.status === 'published') && (
-                        <IconButton
-                          variant="plain"
-                          type="button"
-                          className="om-sa-game-tile-deploy"
-                          title={t('Share')}
-                          aria-label={`${t('Share')}: ${title}`}
-                          onClick={() => onDeployGame(game)}
-                          icon={<RemixIcon name="share-forward-line" size={13} />}
-                        />
-                      )}
-                      {!game.multiplayer && (
-                        <Button
-                          variant="plain"
-                          type="button"
-                          className="om-sa-game-tile-remix"
-                          data-composer-source
-                          data-selected={isSelected || undefined}
-                          aria-pressed={isSelected}
-                          title={`${t('Remix')}: ${title}`}
-                          aria-label={`${t('Remix')}: ${title}`}
-                          onClick={() => selectGameForAgent(game)}
-                        >
-                          <RemixIcon name={isSelected ? 'check-line' : 'sparkling-line'} size={12} />
-                          <span>{isSelected ? t('Selected') : t('Remix')}</span>
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {fannedGames.length > 1 && (
-              <IconButton
-                variant="plain"
-                type="button"
-                className="om-sa-game-fan-nav"
-                data-side="next"
-                aria-label={t('Next')}
-                onClick={() => setFanIndex(prev => (prev + 1) % fannedGames.length)}
-                icon={<RemixIcon name="arrow-right-line" size={16} />}
-              />
+                ))}
+              </div>
             )}
+            <span key={`burst-${gameTheme}`} className="om-sa-game-burst" aria-hidden="true" />
+            {/* Display-only cards: they show what this mode makes; the template list below is where to play or remix. */}
+            <div
+              key={`float-${gameTheme}`}
+              className="om-sa-game-float"
+              data-theme={gameTheme}
+              data-ready={gameCatalogSettled || undefined}
+              aria-hidden="true"
+            >
+              {heroFloatCards.map((card, slot) => (
+                <div key={card.id} className="om-sa-game-float-item" data-slot={slot}>
+                  <div className="om-sa-game-float-card">
+                    <span className="om-sa-game-float-media">
+                      <img
+                        src={card.src}
+                        alt=""
+                        style={card.focus ? { objectPosition: card.focus } : undefined}
+                        // Each cover fades in once decoded instead of painting in progressively.
+                        ref={img => { if (img?.complete) img.dataset.loaded = 'true'; }}
+                        onLoad={event => { event.currentTarget.dataset.loaded = 'true'; }}
+                      />
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <span className="om-creation-icon om-sa-mode-hero-icon" data-tone={effectiveHeroMode.tone} aria-hidden="true">
             <RemixIcon name={effectiveHeroMode.icon} size={22} />
           </span>
         )}
-        <div className="om-sa-mode-hero-copy" ref={mode.id === 'game' ? gameTitleRef : undefined}>
-          <h2>{t(effectiveHeroMode.title)}</h2>
+        <div
+          className="om-sa-mode-hero-copy"
+          key={mode.id === 'game' ? `copy-${gameTheme}` : undefined}
+          ref={mode.id === 'game' ? gameTitleRef : undefined}
+        >
+          <h2>{t(mode.id === 'game' ? GAME_HERO_TITLES[gameTheme] : effectiveHeroMode.title)}</h2>
           {effectiveHeroMode.subtitle && <p className="om-muted">{t(effectiveHeroMode.subtitle)}</p>}
         </div>
 
@@ -1753,8 +1737,8 @@ export function ModeResourceShowcase({
           <div className="om-sa-game-genre-strip" role="group" aria-label={t('Genre')}>
             {gameGenres.map(id => {
               const selected = modeOptions?.gameGenre === id;
+              // Square game-scene thumbnails drawn in the style of each genre's best-known hits.
               const cover = genreHomeCovers[id];
-              const filter = `genre:${id}`;
               return (
                 <Button
                   key={id}
@@ -1763,16 +1747,15 @@ export function ModeResourceShowcase({
                   className="om-sa-game-genre-card"
                   aria-pressed={selected}
                   data-active={selected || undefined}
-                  onClick={() => {
-                    const clear = selected && activeFilter === filter;
-                    onChangeModeOptions?.({ gameGenre: clear ? null : id });
-                    selectGameShortcut(clear ? 'all' : filter);
-                  }}
+                  // Picking a figure only sets the brief's genre, like the composer's genre chip; the
+                  // template list below and the scroll position stay where they are.
+                  onClick={() => onChangeModeOptions?.({ gameGenre: selected ? null : id })}
                 >
-                  <span className="om-sa-game-genre-art" aria-hidden="true">
+                  {/* The name sits inside the thumbnail so it is centered on the picture, not on the grid cell. */}
+                  <span className="om-sa-game-genre-art">
                     {cover ? <img src={cover} alt="" /> : <RemixIcon name="gamepad-line" size={22} />}
+                    <span className="om-sa-game-genre-name">{t(genreLabels[id])}</span>
                   </span>
-                  <span>{t(genreLabels[id])}</span>
                 </Button>
               );
             })}

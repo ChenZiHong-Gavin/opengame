@@ -140,6 +140,7 @@ export async function packageOpenGame(
     for (const name of [
       'runtime-assets.mjs',
       'npm-runtime.mjs',
+      'game-workflow-adapt.mjs',
       'opengame-hosts.mjs',
       'opengame-check-mcp.mjs',
       'opengame-updater.mjs',

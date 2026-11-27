@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { adaptGameWorkflowMarkdown, gameWorkflowReadNext } from '../scripts/game-workflow-adapt.mjs';
 export { workflowEntryGuide } from './workflow-entry.js';
 
 export const workflowRegistry = {
@@ -177,7 +178,25 @@ export async function readWorkflowResource(uri: unknown, dataDirectory: string, 
   const allowedWorkflows = profile === 'game' ? gameWorkflowNames : phase1WorkflowNames;
   if (profile !== 'game' && /^(?:openmotion|motion):\/\/fonts\//.test(uri)) return { uri, mimeType: 'application/json', text: JSON.stringify(await fontCatalogResource(uri)) };
   const match = /^(?:openmotion|motion):\/\/workflow\/([a-z]+(?:-[a-z]+)*)\/([a-z]+)$/.exec(uri);
-  if (match && allowedWorkflows.includes(match[1])) return { uri, mimeType: 'application/json', text: JSON.stringify({ ...await getWorkflow(match[2], match[1]), workflows: allowedWorkflows }) };
+  if (match && allowedWorkflows.includes(match[1])) {
+    const doc = await getWorkflow(match[2], match[1]);
+    if (profile === 'game') {
+      const content = adaptGameWorkflowMarkdown(doc.documentId, doc.content);
+      return {
+        uri,
+        mimeType: 'application/json',
+        text: JSON.stringify({
+          ...doc,
+          content,
+          contentHash: createHash('sha256').update(content).digest('hex'),
+          references: doc.references.filter(ref => gameWorkflowNames.includes(ref.workflow)),
+          readNext: gameWorkflowReadNext,
+          workflows: allowedWorkflows,
+        }),
+      };
+    }
+    return { uri, mimeType: 'application/json', text: JSON.stringify({ ...doc, workflows: allowedWorkflows }) };
+  }
   if (profile === 'game') throw new Error('INVALID_RESOURCE_URI');
   const engine = /^(?:openmotion|motion):\/\/engine\/([a-zA-Z0-9_/-]+\.md)$/.exec(uri);
   if (!engine) throw new Error('INVALID_RESOURCE_URI');

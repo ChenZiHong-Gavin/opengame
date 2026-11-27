@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { canonical, nativeComponents, obtainAsset, readJSON, relativePath, runFile, withLock, writeAtomic, writeJSON } from './runtime-assets.mjs';
-import { ensureNativeRuntime, startNativePreparation } from './npm-runtime.mjs';
+import { ensureNativeRuntime, nativeConfiguration, startNativePreparation } from './npm-runtime.mjs';
 import { checkSkillOwner, copyHostSkills, defaultOpenGameHome, hostPlan, hosts, managedBy, skillTargets } from './opengame-hosts.mjs';
 import { callInstalledOpenGameTool, checkOpenGameTransport, redact } from './opengame-check-mcp.mjs';
 import {
@@ -25,7 +25,7 @@ export { managedBy };
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const bundledManifest = fileURLToPath(new URL('../payload/release-npm.json', import.meta.url));
-const launcherRuntimeFiles = ['runtime-assets.mjs', 'opengame-hosts.mjs', 'opengame-check-mcp.mjs', 'opengame-updater.mjs'];
+const launcherRuntimeFiles = ['runtime-assets.mjs', 'game-workflow-adapt.mjs', 'opengame-hosts.mjs', 'opengame-check-mcp.mjs', 'opengame-updater.mjs'];
 const contains = (parent, child) => {
   const rel = path.relative(parent, child);
   return rel === '' || (!rel.startsWith('..' + path.sep) && rel !== '..' && !path.isAbsolute(rel));
@@ -510,11 +510,16 @@ async function main() {
     const home = await resolveInstalledHome(values.home);
     const state = await readInstallState(home);
     assert(state?.managedBy === managedBy, 'Run opengame setup first.');
-    const components = values['with-trailer'] ? undefined : ['browser'];
-    await ensureNativeRuntime(state.current.appRoot, components);
-    console.log(values['with-trailer']
-      ? 'Pinned headless browser and trailer media components (FFmpeg/ffprobe) are ready.'
-      : 'Pinned headless browser is ready (pass --with-trailer to also pre-download FFmpeg/ffprobe).');
+    const native = await nativeConfiguration(state.current.appRoot);
+    if (!native) {
+      console.log(`No pinned native downloads for ${process.platform}-${process.arch}; using system Chrome/FFmpeg or HYPERFRAMES_* environment overrides.`);
+    } else {
+      const components = values['with-trailer'] ? undefined : ['browser'];
+      await ensureNativeRuntime(state.current.appRoot, components);
+      console.log(values['with-trailer']
+        ? 'Pinned headless browser and trailer media components (FFmpeg/ffprobe) are ready.'
+        : 'Pinned headless browser is ready (pass --with-trailer to also pre-download FFmpeg/ffprobe).');
+    }
   } else if (command === 'diagnose') {
     const result = await diagnose({ home: values.home, host: values.host, codex: values.codex, claude: values.claude, dsh: values.dsh, profile: values.profile });
     console.log(JSON.stringify(result, null, 2));

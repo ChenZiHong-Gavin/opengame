@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -19,10 +19,31 @@ import {
   stageNpmUpdate,
 } from '../scripts/opengame-updater.mjs';
 import { runFile, writeJSON } from '../scripts/runtime-assets.mjs';
+import { configureNativeEnvironment, nativeConfiguration, nativeRuntimeStatus } from '../scripts/npm-runtime.mjs';
 import { startServer } from '../server.ts';
 import { WorkspaceStore } from '../workspace.ts';
 
 import { offlineGame } from '../scripts/game-template-publication.ts';
+
+const gameToolSet = new Set<string>(JSON.parse(await readFile(new URL('../shared/mcp-profiles.json', import.meta.url), 'utf8')).game.tools);
+
+async function allocateFreePort(): Promise<number> {
+  const probe = createServer();
+  await new Promise<void>(resolve => probe.listen(0, '127.0.0.1', resolve));
+  const port = (probe.address() as { port: number }).port;
+  await new Promise<void>(resolve => probe.close(() => resolve()));
+  return port;
+}
+
+async function listMarkdownFiles(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...await listMarkdownFiles(full));
+    else if (entry.isFile() && entry.name.endsWith('.md')) out.push(full);
+  }
+  return out;
+}
 
 const repoNodeModules = path.resolve('node_modules');
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==', 'base64');
@@ -73,7 +94,7 @@ test('compareSemver orders stable and prerelease versions accurately', () => {
 });
 
 test('OpenGame setup isolates hosts and coexists with OpenMotion, then updates, defers on busy backend, and auto-rolls back crash loops', { timeout: 240_000 }, async t => {
-  const dir = await mkdtemp(path.join(tmpdir(), 'opengame-e2e-'));
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'opengame-e2e-')));
   t.after(() => rm(dir, { recursive: true, force: true }));
 
   const gamesRoot = await createGamesFixture(dir);
@@ -119,7 +140,8 @@ pkg.dependencies = { ...(pkg.dependencies || {}), [bundlePkg.name]: 'file:' + bu
 await writeFile(file, JSON.stringify(pkg, null, 2));
 `);
 
-  await withEnv({ WORKBUDDY_CONFIG_DIR: workbuddyDir, CLAUDE_CONFIG_DIR: claudeDir, DSH_HOME: dshHome }, async () => {
+  const isolatedPort = await allocateFreePort();
+  await withEnv({ WORKBUDDY_CONFIG_DIR: workbuddyDir, CLAUDE_CONFIG_DIR: claudeDir, DSH_HOME: dshHome, PORT: String(isolatedPort) }, async () => {
     // 1. Setup WorkBuddy, DeepSeek Harness, and generic Agent (opencode) against v1.
     const wb = await setup({
       manifest: pkg1.manifest, home, dataDirectory: dataDir, host: 'workbuddy',
@@ -136,6 +158,14 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     const ogSkill = await readFile(path.join(workbuddyDir, 'skills', 'opengame-game', 'SKILL.md'), 'utf8');
     assert.match(ogSkill, /^name: opengame-game$/m);
     assert.match(ogSkill, /opengame_create/);
+    for (const skillDir of ['opengame-game', 'opengame-media']) {
+      for (const mdFile of await listMarkdownFiles(path.join(workbuddyDir, 'skills', skillDir))) {
+        const text = await readFile(mdFile, 'utf8');
+        for (const match of text.matchAll(/\b(?:openmotion|motion|design|opengame)_[a-z_]+\b/g)) {
+          assert(gameToolSet.has(match[0]), `Installed ${skillDir}/${path.basename(mdFile)} references unexposed tool ${match[0]}`);
+        }
+      }
+    }
 
     const dshRes = await setup({
       manifest: pkg1.manifest, home, dataDirectory: dataDir, host: 'deepseek', profile: 'game-test', dsh: fakeDsh,
@@ -432,4 +462,40 @@ test('server exposes loopback-only /api/runtime/activity and /api/runtime/retire
   assert.equal(retireBody.retired, true);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(retiredFlag, true);
+});
+
+test('unpinned host platforms (for example Linux CI) fall back to system/env native tools without crashing startup', async t => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'opengame-unpinned-native-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  await writeJSON(path.join(dir, '.npm-install.json'), {
+    schemaVersion: 1,
+    cacheDirectory: path.join(dir, 'cache/native'),
+    runtime: {
+      targets: {
+        'other-arch': {
+          platform: 'sunos',
+          arch: 'sparc',
+          browser: { url: 'https://example.invalid/browser.zip', sha256: 'a'.repeat(64), executable: 'chrome' },
+        },
+      },
+    },
+  });
+  await withEnv({
+    HYPERFRAMES_BROWSER_PATH: undefined,
+    HYPERFRAMES_FFMPEG_PATH: undefined,
+    HYPERFRAMES_FFPROBE_PATH: undefined,
+    MOTION_BROWSER_PATH: '/usr/bin/custom-chrome',
+    FFMPEG_PATH: '/usr/bin/custom-ffmpeg',
+    FFPROBE_PATH: '/usr/bin/custom-ffprobe',
+  }, async () => {
+    assert.equal(await nativeConfiguration(dir), null);
+    assert.equal(await configureNativeEnvironment(dir), null);
+    assert.equal(process.env.HYPERFRAMES_BROWSER_PATH, '/usr/bin/custom-chrome');
+    assert.equal(process.env.HYPERFRAMES_FFMPEG_PATH, '/usr/bin/custom-ffmpeg');
+    assert.equal(process.env.HYPERFRAMES_FFPROBE_PATH, '/usr/bin/custom-ffprobe');
+    const status = await nativeRuntimeStatus(dir);
+    assert.equal(status.managed, false);
+    assert.deepEqual(status.components, []);
+    assert.equal(status.capabilities.capture, true);
+  });
 });

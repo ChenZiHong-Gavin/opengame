@@ -22,7 +22,7 @@ export async function nativeConfiguration(root) {
 function configuration(config) {
   assert.equal(config.schemaVersion, 1, 'Unsupported npm installation');
   const found = Object.entries(config.runtime.targets).find(([, value]) => value.platform === process.platform && value.arch === process.arch);
-  assert(found, `No pinned native runtime for ${process.platform}-${process.arch}`);
+  if (!found) return null;
   const [target, info] = found;
   assert(/^[a-z0-9-]+$/.test(target), 'Invalid native target');
   const components = nativeComponents(info);

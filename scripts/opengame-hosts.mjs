@@ -3,6 +3,7 @@ import { access, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } 
 import path from 'node:path';
 import os from 'node:os';
 import { canonical, readJSON, runFile, withLock, writeJSON } from './runtime-assets.mjs';
+import { adaptGameWorkflowMarkdown } from './game-workflow-adapt.mjs';
 
 // Dedicated registration adapters; any other valid lowercase --host installs the same
 // application, launcher and Skills, returning agentRegistration for that Agent to add.
@@ -214,7 +215,7 @@ async function rewriteGameSkillMarkdown(directory, originalDirectory, appRoot, r
       await rewriteGameSkillMarkdown(filename, originalFile, appRoot, null);
     } else if (entry.name.endsWith('.md')) {
       let content = await readFile(filename, 'utf8');
-      let updated = content.replaceAll('openmotion_game_', 'opengame_');
+      let updated = adaptGameWorkflowMarkdown(originalFile, content);
       if (renameFrontmatter && entry.name === 'SKILL.md') {
         updated = updated.replace(/^name: .+$/m, 'name: ' + renameFrontmatter);
       }

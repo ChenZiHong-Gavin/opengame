@@ -37,9 +37,27 @@ test('game MCP profile exposes opengame_* and shared openmotion_* tools with iso
   assert(resources.result.resources.length > 0);
   assert(resources.result.resources.every((r: any) => /^openmotion:\/\/workflow\/(?:game|media)\//.test(r.uri)));
 
+  const allowedToolSet = new Set(expected);
+  for (const resource of resources.result.resources) {
+    const readRes: any = await rpc({ jsonrpc: '2.0', id: `res:${resource.uri}`, method: 'resources/read', params: { uri: resource.uri } }, store, registry);
+    assert.equal(readRes.error, undefined, `Failed reading ${resource.uri}`);
+    const payload = JSON.parse(readRes.result.contents[0].text);
+    assert(payload.references.every((ref: any) => ['game', 'media'].includes(ref.workflow)), `Out-of-profile reference in ${resource.uri}`);
+    assert.doesNotMatch(payload.readNext, /production\//);
+    for (const match of payload.content.matchAll(/\b(?:openmotion|motion|design|opengame)_[a-z_]+\b/g)) {
+      assert(allowedToolSet.has(match[0]), `${resource.uri} references unexposed tool ${match[0]}`);
+    }
+  }
+
   const gameStart: any = await rpc({ jsonrpc: '2.0', id: 4, method: 'resources/read', params: { uri: 'openmotion://workflow/game/start' } }, store, registry);
   assert.equal(gameStart.error, undefined);
   assert.match(gameStart.result.contents[0].text, /openmotion-game/);
+  assert.match(gameStart.result.contents[0].text, /opengame_create/);
+
+  const mediaMaterials: any = await rpc({ jsonrpc: '2.0', id: 41, method: 'resources/read', params: { uri: 'openmotion://workflow/media/materials' } }, store, registry);
+  const mediaMaterialsDoc = JSON.parse(mediaMaterials.result.contents[0].text);
+  assert.match(mediaMaterialsDoc.content, /openmotion_asset_manage/);
+  assert.doesNotMatch(mediaMaterialsDoc.content, /openmotion_(?:get|edit)_project|openmotion_import_assets/);
 
   const blockedWorkflow: any = await rpc({ jsonrpc: '2.0', id: 5, method: 'resources/read', params: { uri: 'openmotion://workflow/production/start' } }, store, registry);
   assert(blockedWorkflow.error, 'Video-only workflow must be rejected under game profile');

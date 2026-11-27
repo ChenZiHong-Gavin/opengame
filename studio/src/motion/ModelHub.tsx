@@ -236,7 +236,14 @@ export function ModelHub({ id, onExplore, onProvider, onModel, onUse, onScene, o
   const promoBadgeText = hub?.promoBadge ? t(hub.promoBadge) : undefined;
   const markBfPillCheckoutReturn = useCheckoutReturnRefresh('model_hub', 'model_hub_bf_pill');
   const bfPillReportedRef = useRef<string | null>(null);
+  const bfPillImpressionEntryRef = useRef<{ hubId: string; entryId: string } | null>(null);
   const showBfPill = Boolean(hub && isShowcaseHub && bfActive && promoBadgeText);
+  useEffect(() => {
+    if (!hub || !showBfPill) { bfPillImpressionEntryRef.current = null; return; }
+    if (bfPillImpressionEntryRef.current?.hubId !== hub.id) {
+      bfPillImpressionEntryRef.current = { hubId: hub.id, entryId };
+    }
+  }, [hub, showBfPill, entryId]);
   useEffect(() => {
     if (!hub || viewed.current || !accountKnown) return;
     viewed.current = true;
@@ -246,13 +253,16 @@ export function ModelHub({ id, onExplore, onProvider, onModel, onUse, onScene, o
     if (!hub || !showBfPill) { bfPillReportedRef.current = null; return; }
     if (!accountKnown || bfPillReportedRef.current === hub.id) return;
     bfPillReportedRef.current = hub.id;
+    const impressionEntryId = bfPillImpressionEntryRef.current?.hubId === hub.id
+      ? bfPillImpressionEntryRef.current.entryId
+      : entryId;
     send('surface_view', {
       page_name: 'model_hub',
       area: 'hub_header',
       element: 'banner',
       hook_id: 'model_hub_bf_pill',
       campaign_id: BLACK_FRIDAY_CAMPAIGN,
-      entry_id: entryId,
+      entry_id: impressionEntryId,
       ...slugField('hub_id', hub.id),
       signed_in: signedIn,
     });
@@ -349,6 +359,9 @@ export function ModelHub({ id, onExplore, onProvider, onModel, onUse, onScene, o
                       {...pricingLinkTargetProps()}
                       onClick={event => {
                         const clickedId = entryId;
+                        if (bfPillImpressionEntryRef.current?.hubId !== hub.id) {
+                          bfPillImpressionEntryRef.current = { hubId: hub.id, entryId: clickedId };
+                        }
                         markBfPillCheckoutReturn(clickedId);
                         track('hub_header', 'claim_offer', {
                           hookId: 'model_hub_bf_pill',

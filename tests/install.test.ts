@@ -9,10 +9,11 @@ test('installation onboarding routes only to existing Skills', async () => {
   const script = await readFile(new URL('../scripts/install-motion.command', import.meta.url), 'utf8');
   assert.match(script, /scripts\/install-onboarding\.mjs/);
   const contract = await readFile(new URL('../docs/install.md', import.meta.url), 'utf8');
-  assert.match(contract, /When `hasHtmlProject` is true, use `openmotion-template-to-video` to reuse the editable source/);
-  assert.match(contract, /Use `openmotion-recreate` only when the source has no editable project/);
-  await access(new URL('../skills/openmotion-recreate/SKILL.md', import.meta.url));
-  await access(new URL('../skills/openmotion-template-to-video/SKILL.md', import.meta.url));
+  assert.match(contract, /When `hasHtmlProject` is true, use `openmotion-video`'s `template-to-video` workflow/);
+  assert.match(contract, /Use `openmotion-video`'s `recreate` workflow .* only when the source has no editable project/);
+  await access(new URL('../skills/openmotion-video/SKILL.md', import.meta.url));
+  await access(new URL('../skills/openmotion-video/workflows/recreate.md', import.meta.url));
+  await access(new URL('../skills/openmotion-video/workflows/template-to-video.md', import.meta.url));
   const guide = new URL('../docs/usage.md', import.meta.url);
   const guideText = await readFile(guide, 'utf8');
   assert.match(guideText, /install\.md#installation-success-reply/);
@@ -75,4 +76,33 @@ test('source and complete installers register the canonical plugin and caches pr
     }
     assert.equal(resolveInstalled(project, codex), path.join(codex, 'plugins/cache/openmotion-local/openmotion/0.2.0'));
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('OpenGame main entry Skill and setup guides install opengame once before local setup', async () => {
+  const entrySkill = await readFile(new URL('../skills/opengame/SKILL.md', import.meta.url), 'utf8');
+  assert.match(entrySkill, /^---\nname: opengame\ndescription: .+\n---/);
+  assert.match(entrySkill, /https:\/\/github\.com\/nexu-io\/opengame\/blob\/main\/docs\/opengame-setup\.md/);
+  assert.match(entrySkill, /openmotion:\/\/workflow\/game\/start/);
+  assert.match(entrySkill, /openmotion:\/\/workflow\/media\/start/);
+  assert.match(entrySkill, /local stdio MCP/i);
+  const setupGuide = await readFile(new URL('../docs/opengame-setup.md', import.meta.url), 'utf8');
+  assert.match(setupGuide, /npx --yes skills@1\.9\.0 add https:\/\/github\.com\/nexu-io\/opengame\/tree\/skills --skill opengame --global --agent AGENT --copy --yes/);
+  assert.match(setupGuide, /OPENMOTION_SKIP_PUBLIC_SKILL=1/);
+  assert.match(setupGuide, /already installed/i);
+  assert.match(setupGuide, /does not block/i);
+  const rootForwarder = await readFile(new URL('../install.md', import.meta.url), 'utf8');
+  assert.match(rootForwarder, /\]\(docs\/opengame-setup\.md\)/);
+  assert.match(rootForwarder, /`opengame` Skill/);
+  for (const readme of ['../README.md', '../README.zh-CN.md', '../README.ja.md', '../docs/README.zh-CN.md', '../docs/README.ja.md']) {
+    const body = await readFile(new URL(readme, import.meta.url), 'utf8');
+    assert.match(body, /npx skills add https:\/\/github\.com\/nexu-io\/opengame\/tree\/skills --skill opengame/, readme);
+    assert.match(body, /skills\/opengame\/SKILL\.md/, readme);
+    assert.match(body, /Git LFS/, readme);
+    assert.match(body, /git lfs install --local --skip-smudge/, readme);
+  }
+  const syncWorkflow = await readFile(new URL('../.github/workflows/sync-skills-branch.yml', import.meta.url), 'utf8');
+  assert.match(syncWorkflow, /github\.repository == 'nexu-io\/opengame'/);
+  assert.match(syncWorkflow, /filter: blob:none/);
+  assert.match(syncWorkflow, /sparse-checkout: \|\n\s+skills\/opengame\n\s+skills\/openmotion-game\n\s+skills\/openmotion-media/);
+  assert.match(syncWorkflow, /refs\/heads\/skills/);
 });

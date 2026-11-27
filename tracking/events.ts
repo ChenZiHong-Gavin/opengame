@@ -1,4 +1,31 @@
-import { assetImportErrorCodes, exportFailureCodes, exportFailureStages, mediaGenerationErrorCodes, superAgentErrorCodes, toolDimensions, toolFailureDimensions } from './tool-fields.ts';
+import {
+  assetImportErrorCodes,
+  exportFailureCodes,
+  exportFailureStages,
+  mediaGenerationAccountPlans,
+  mediaGenerationAspectRatios,
+  mediaGenerationAudioKinds,
+  mediaGenerationCancelPhases,
+  mediaGenerationCancelSources,
+  mediaGenerationDestinations,
+  mediaGenerationEntrySurfaces,
+  mediaGenerationErrorCategories,
+  mediaGenerationErrorCodes,
+  mediaGenerationExecutorKinds,
+  mediaGenerationFailurePhases,
+  mediaGenerationModes,
+  mediaGenerationPipelineSteps,
+  mediaGenerationRejectionCategories,
+  mediaGenerationRejectionReasons,
+  mediaGenerationResolutions,
+  mediaGenerationRouteChannels,
+  mediaGenerationSpatialKinds,
+  mediaGenerationUpstreamErrorCodes,
+  mediaModalities,
+  superAgentErrorCodes,
+  toolDimensions,
+  toolFailureDimensions,
+} from './tool-fields.ts';
 import type { Entry, Registry } from './core.ts';
 import { studioUsageEvents } from './studio-events.ts';
 import { templateEntries } from '../shared/template-attribution.ts';
@@ -23,13 +50,27 @@ export const webMcpToolNames = ['openmotion_capability_discover', 'openmotion_ca
   'openmotion_studio_look', 'openmotion_studio_select', 'openmotion_studio_seek',
   'openmotion_studio_frame', 'openmotion_studio_inspect'] as const;
 const webMcp = { tool_name: webMcpToolNames, transport: ['webmcp'] } as const;
-const generation = { modality: ['image', 'video', 'audio'] } as const;
+const generation = { modality: mediaModalities } as const;
 const mediaGenerationDimensions = {
+  executor_kind: mediaGenerationExecutorKinds,
   provider_kind: ['builtin', 'custom', 'account', 'agent'],
+  route_channel: mediaGenerationRouteChannels,
   model_provider: 'slug',
   model_id: 'model_id',
   capability_id: 'code',
+  entry_surface: mediaGenerationEntrySurfaces,
+  destination: mediaGenerationDestinations,
+  generation_mode: mediaGenerationModes,
+  audio_kind: mediaGenerationAudioKinds,
+  spatial_kind: mediaGenerationSpatialKinds,
+  pipeline_step: mediaGenerationPipelineSteps,
   reference_count: 'integer',
+  is_edit: 'boolean',
+  account_plan: mediaGenerationAccountPlans,
+  requested_duration_sec: { min: 0, max: 600, integer: true },
+  requested_aspect_ratio: mediaGenerationAspectRatios,
+  requested_resolution: mediaGenerationResolutions,
+  requested_audio: 'boolean',
 } as const;
 const superAgentRuntimeKinds = ['local-direct', 'local-bridge', 'remote-service'] as const;
 const superAgentIntents = ['chat', 'coding', 'design', 'research', 'visualization', 'image', 'video', 'audio', 'game', 'website', 'slides', 'brand', 'other'] as const;
@@ -166,11 +207,65 @@ export const omEvents = {
     error_code: [...toolFailureDimensions.error_code, ...assetImportErrorCodes] }, required: ['failed_count', 'error_code'] },
   export_request_result: { producers: ['mcp'], fields: { ...business, job_id: 'uuid', queue_state: ['pending', 'running', 'cancelling', 'cancelled', 'completed', 'failed'] }, required: ['outcome'] },
   export_cancel_result: { producers: ['mcp'], fields: { ...business, job_id: 'uuid', state_after: ['pending', 'running', 'cancelling', 'cancelled', 'completed', 'failed'] }, required: ['outcome'] },
-  media_generation_requested: { producers: ['worker'], fields: { ...generation, capability_id: 'code' }, required: ['modality'] },
-  media_generation_submitted: { producers: ['worker'], fields: { ...generation, ...mediaGenerationDimensions, job_id: 'uuid' }, required: ['modality', 'job_id'] },
-  media_generation_result: { producers: ['worker'], fields: { ...generation, ...mediaGenerationDimensions, job_id: 'uuid',
-    job_state: ['completed', 'failed', 'cancelled'], asset_count: 'integer', duration_ms: 'integer', queue_wait_ms: 'integer',
-    attempt_kind: ['initial', 'resume', 'retry_save'], remote_terminal: 'boolean', error_code: mediaGenerationErrorCodes }, required: ['modality', 'job_id', 'job_state', 'asset_count'] },
+  media_generation_requested: { producers: ['worker'], fields: {
+    ...generation, request_id: 'uuid', capability_id: 'code',
+    executor_kind: mediaGenerationExecutorKinds,
+    spatial_kind: mediaGenerationSpatialKinds,
+    entry_surface: mediaGenerationEntrySurfaces, destination: mediaGenerationDestinations,
+    generation_mode: mediaGenerationModes, reference_count: 'integer', is_edit: 'boolean',
+    has_idempotency_key: 'boolean',
+  }, required: ['modality'] },
+  media_generation_rejected: { producers: ['worker'], fields: {
+    ...generation, ...mediaGenerationDimensions, request_id: 'uuid',
+    has_idempotency_key: 'boolean',
+    rejection_reason: mediaGenerationRejectionReasons,
+    rejection_category: mediaGenerationRejectionCategories,
+  }, required: ['modality', 'request_id', 'rejection_reason', 'rejection_category'] },
+  media_generation_replayed: { producers: ['worker'], fields: {
+    ...generation, ...mediaGenerationDimensions, request_id: 'uuid', job_id: 'uuid',
+    existing_job_state: ['queued', 'running', 'completed', 'failed', 'cancelled'],
+  }, required: ['modality', 'request_id', 'job_id', 'existing_job_state'] },
+  media_generation_submitted: { producers: ['worker'], fields: {
+    ...generation, ...mediaGenerationDimensions, job_id: 'uuid',
+    request_id: 'uuid', attempt_id: 'uuid', attempt_number: 'integer',
+    attempt_kind: ['initial', 'resume', 'retry_save'],
+    has_idempotency_key: 'boolean', queue_depth: 'integer',
+  }, required: ['modality', 'job_id'] },
+  media_generation_retry_started: { producers: ['worker'], fields: {
+    ...generation, ...mediaGenerationDimensions, job_id: 'uuid',
+    request_id: 'uuid', attempt_id: 'uuid', attempt_number: 'integer',
+    attempt_kind: ['resume', 'retry_save'],
+    previous_error_code: mediaGenerationErrorCodes,
+    previous_failure_phase: mediaGenerationFailurePhases,
+  }, required: ['modality', 'job_id', 'attempt_id', 'attempt_number', 'attempt_kind'] },
+  media_generation_retry_rejected: { producers: ['worker'], fields: {
+    ...generation, ...mediaGenerationDimensions, job_id: 'uuid',
+    request_id: 'uuid',
+    attempt_kind: ['resume', 'retry_save'],
+    rejection_reason: mediaGenerationRejectionReasons,
+    rejection_category: mediaGenerationRejectionCategories,
+  }, required: ['modality', 'job_id', 'attempt_kind', 'rejection_reason', 'rejection_category'] },
+  media_generation_result: { producers: ['worker'], fields: {
+    ...generation, ...mediaGenerationDimensions, job_id: 'uuid',
+    request_id: 'uuid', attempt_id: 'uuid', attempt_number: 'integer',
+    job_state: ['completed', 'failed', 'cancelled'], asset_count: 'integer',
+    duration_ms: 'integer', queue_wait_ms: 'integer', end_to_end_ms: 'integer',
+    upload_ms: 'integer', remote_ms: 'integer', download_ms: 'integer', save_ms: 'integer',
+    cancel_wait_ms: 'integer',
+    attempt_kind: ['initial', 'resume', 'retry_save'], remote_terminal: 'boolean',
+    has_remote_id: 'boolean', is_resumable: 'boolean', save_pending: 'boolean',
+    reconnected_count: 'integer', total_output_bytes: { min: 0, max: 536_870_912, integer: true },
+    failure_phase: mediaGenerationFailurePhases,
+    phase_before_cancel: mediaGenerationCancelPhases,
+    last_active_phase: mediaGenerationCancelPhases,
+    cancel_source: mediaGenerationCancelSources,
+    http_status: { min: 100, max: 599, integer: true },
+    upstream_error_code: mediaGenerationUpstreamErrorCodes,
+    error_code: mediaGenerationErrorCodes,
+    error_category: mediaGenerationErrorCategories,
+    previous_error_code: mediaGenerationErrorCodes,
+    previous_failure_phase: mediaGenerationFailurePhases,
+  }, required: ['modality', 'job_id', 'job_state', 'asset_count'] },
   export_result: { producers: ['worker'], fields: { job_id: 'uuid', job_state: ['completed', 'failed', 'cancelled'], duration_ms: 'integer', technical_check: ['passed', 'failed', 'unknown'], failure_stage: exportFailureStages, error_code: exportFailureCodes }, required: ['job_id', 'job_state', 'duration_ms', 'technical_check'] },
   // One per finished OpenDesign sign-in attempt. `replaced` is an interrupted attempt the service refused; the same
   // sign-in continues with a new attempt. Times are milliseconds since the click. Stage values come from the connector

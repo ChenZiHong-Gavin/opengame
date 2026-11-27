@@ -244,21 +244,38 @@ audio/geometry measurements; non-finite or out-of-range values are rejected.
 
 ### Host Agent attribution
 
-Every event has `host_agent` and `host_agent_source`. Known declared clients map
-to `codex`, `deepseek` (DeepSeek Harness/DSH), `claude`, `cursor`, `opencode`,
-`gemini`, `workbuddy` or `chatgpt`; another declared client maps to `other`.
+Every event has `host_agent` and `host_agent_source`. Known declared clients and
+supported local Agents map to a closed `hostAgents` enum (`codex`, `deepseek`
+(DeepSeek Harness/DSH), `claude`, `cursor`, `opencode`, `gemini`, `workbuddy`,
+`chatgpt`, `antigravity`, `hermes`, `qoder`, `trae`, `copilot`, plus the
+supported local Agents in `shared/local-agents.ts`); any other declared client
+maps to `other`.
 Missing evidence is `unknown`, never inferred from an installed executable,
 model provider, browser user agent or the last caller of a shared backend.
+Declared client names are trimmed, lowercased and whitespace-collapsed to `-`
+before matching and bounded validation so clients like `"Claude Desktop"` or
+`"Cherry Studio"` retain `mcp_client_name`.
 `mcp_client_name` is included only for a bounded implementation identifier;
 `mcp_client_version` is the client's declared numeric version, not a verified
 host-application version. DSH currently declares its MCP adapter version.
 
 The stdio runtime captures `initialize.params.clientInfo` per connection and also
 recognizes standard per-request `io.modelcontextprotocol/clientInfo` metadata.
-An absent declaration can fall back to `OPENMOTION_HOST_AGENT`, `CODEX_THREAD_ID`
-or `CLAUDECODE=1` in that MCP process, labeled `launch_environment`. Environment
-values and thread IDs themselves are never reported. Client metadata is
-self-declared analytics context, not authenticated identity or an entitlement.
+An absent declaration—or a bridge/placeholder declaration (`openmotion-cli`, `om-cli`,
+or `openmotion`, which WorkBuddy desktop sends from the server key) when invoked with a
+recognized `--host` (`OPENMOTION_HOST_AGENT`) or inside a known host shell—falls back to
+`OPENMOTION_HOST_AGENT`, `CODEX_THREAD_ID`, `CLAUDECODE=1`/`CLAUDE_CODE_SESSION_ID`,
+`CODEBUDDY_SANDBOX_BROKER_IPC_ADDRESS`/`WORKBUDDY_GPU_DEVICE_NAME`,
+`DSH_WEB_URL`, `CURSOR_TRACE_ID`/`CURSOR_AGENT`, `ANTIGRAVITY_AGENT`,
+`GEMINI_SESSION_ID`/`GEMINI_CLI`, or `OPENCODE`/`OPENCODE_CLIENT` in that MCP process,
+labeled `launch_environment` (retaining the original `mcp_client_name`). When no known
+host signal is present, placeholder declarations fall back to `host_agent: other` so
+arbitrary environment values and thread IDs are never reported. Internal transport health
+preflights (`scripts/mcp-client.mjs` workspace checks before another tool and
+`scripts/check-installed-mcp.mjs` install probes) set `_meta['openmotion/internalProbe']=true`,
+which executes normally while suppressing duplicate `mcp_tool_*` business counts and session
+activation. Client metadata is self-declared analytics context, not authenticated identity or
+an entitlement.
 
 The calling context follows domain operations and is persisted on export jobs
 for the worker. Editor handoffs receive an opaque `tracking_context` query token;
@@ -312,8 +329,27 @@ When a Codex connection invokes an OpenMotion MCP `tools/call` or `resources/rea
 An adaptive incremental background pass (2.5 seconds after MCP activity, two 10-second follow-ups, then 60-second intervals) plus startup and shutdown sweeps open `${CODEX_HOME:-~/.codex}/state_5.sqlite` and `thread_history_1.sqlite` via `node:sqlite` in `{ readOnly: true }` mode. New queue entries start at `lastSyncedOrdinal = -1` so the first sync backfills prior completed planning/storyboard turns from that same activated thread alongside subsequent turns past `lastSyncedOrdinal`; other Codex threads that never invoke OpenMotion remain untouched:
 
 - **Sanitization and payload bounds**: Every text field passes through `scripts/diagnostic-redaction.mjs` (`redactDiagnostic`) to scrub API keys, Bearer tokens, PEM blocks, URLs, email addresses and local home/workspace paths. `user_query` is capped at 8,000 characters, `reasoning_summary` and `assistant_reply` at 6,000 characters, and MCP tool summaries at 2,000 characters. Host shell `commandExecution` items inspect output locally only to detect `SKILL.md` reads and never upload terminal stdout/stderr text (recording `output_bytes`, command summary, exit code and duration instead). Project source payloads (`arguments.files[].content`, single-file read results such as `file.content` or `{ path, content }`, and `referencePath` reads) retain metadata (`path`, `bytes`, `lines`, offsets) with `content` stripped, `fileChange` diffs are replaced with `{ path, kind, diff_bytes }`, and inline data URIs plus `encrypted_content` are omitted.
-- **PostHog `$ai_generation` contract**: Each newly finished turn emits one `$ai_generation` event directly to PostHog `/batch/` (chunked within 240 KiB per request) using the shared installation identity, hashed OS `device_id`, GeoIP policy and `$process_person_profile=false`. Per-turn `$ai_model` and `reasoning_effort` are resolved from the thread's local rollout JSONL `turn_context` entries (falling back to live MCP turn metadata and then `threads.model` when unavailable). Raw `threadId` is never sent; `session_trace_key` is `sha256(installation_id + ':codex:' + threadId).slice(0, 32)`, `$ai_session_id` is `codex:<session_trace_key>`, and deterministic UUIDs (`uuid` / `$insert_id`) deduplicate retries.
+- **PostHog `$ai_generation` contract**: Each newly finished turn emits one `$ai_generation` event directly to PostHog `/batch/` (chunked within 240 KiB per request) using the shared installation identity, hashed OS `device_id`, GeoIP policy and `$process_person_profile=false`. Per-turn `$ai_model` and `reasoning_effort` are resolved from the thread's local rollout JSONL `turn_context` entries (falling back to live MCP turn metadata and then `threads.model` when unavailable). Raw `threadId` is never sent; `session_trace_key` is `sha256(installation_id + ':codex:' + threadId).slice(0, 32)`, `$ai_session_id` is `codex:<session_trace_key>`, `trace_surface` is `external_mcp`, `trace_source` is `codex_sqlite`, and deterministic UUIDs (`uuid` / `$insert_id`) deduplicate retries.
 - **Lifecycle and user opt-out**: Active threads are sealed and evicted from `active-codex-threads.json` unconditionally after five consecutive sync failures (including backlogs at or above the 20-turn page size) or after 30 minutes of inactivity once pending pages have drained. Turning **Privacy & data → Help us improve** off—or setting `OPENMOTION_TELEMETRY=0` or `DO_NOT_TRACK=1`—immediately aborts any in-flight request, deletes `active-codex-threads.json`, and stops collection. Node/Vitest test runs suppress reporting unless `OPENMOTION_TRACKING_ENV=test` and a valid `OPENMOTION_TRACKING_TEST_RUN_ID` UUID are provided.
+
+### Unified host-session & Super Agent LLM traces (`$ai_generation`)
+
+Beyond Codex, `shared/host-session-tracking.ts` (Claude Code and WorkBuddy) and `shared/super-agent-session-tracking.ts` (Studio built-in Super Agent) share the same `$ai_generation` turn schema, `redactDiagnostic` scrubbing, deterministic sampling (`OPENMOTION_LLM_TRACE_SAMPLE_RATE`, with `error_forced` retention for failed/interrupted turns or MCP tool failures), and Privacy & data opt-out controls:
+
+| `trace_surface` | `trace_source` | `host_agent` | `$ai_session_id` prefix | Activation & local source |
+| --- | --- | --- | --- | --- |
+| `external_mcp` | `codex_sqlite` | `codex` | `codex:<sha256>` | MCP `_meta.threadId` / `x-codex-turn-metadata` → read-only `~/.codex/{state_5,thread_history_1}.sqlite` |
+| `external_mcp` | `claude_jsonl` | `claude` | `claude:<sha256>` | MCP `_meta.sessionId` or `CLAUDE_CODE_SESSION_ID` → read-only `${CLAUDE_CONFIG_DIR:-~/.claude}/projects/<slug>/<sessionId>.jsonl` (aggregated per user turn; streaming `message.id` usage deduplicated) |
+| `external_mcp` | `workbuddy_jsonl` | `workbuddy` | `workbuddy:<sha256>` | MCP `_meta.sessionId` / `conversationId`, `WORKBUDDY_SESSION_ID` / `CODEBUDDY_SESSION_ID`, or exact 32-hex W3C `_meta.traceparent` matched against recent `workbuddy.db` sessions → read-only `${WORKBUDDY_CONFIG_DIR:-~/.workbuddy}/projects/<slug>/<sessionId>.jsonl` |
+| `studio_super_agent` | `super_agent_runtime` | Normalized engine id (`codex`, `claude`, `deepseek`, `antigravity`, `opencode`, `pi`, ...) | `super-agent:<sha256>` | In-memory turn completion in `gateway/super-agent.ts` (`super_agent_engine`, `super_agent_runtime_kind`, `super_agent_intent`, `$ai_input_tokens`, `$ai_output_tokens`) |
+
+Every surface reports one `$ai_generation` event per completed user turn (never per raw streaming chunk or intermediate tool step), strips source file contents/diffs and terminal stdout, never sends raw session/thread IDs, and immediately aborts in-flight batches and removes `active-host-sessions.json` on opt-out.
+
+#### Daily dashboard mapping contract
+
+For readable, zero-ambiguity daily reports:
+- **MCP Agent distribution**: group by `host_agent` as the primary dimension, and expose CLI bridge vs native MCP as a secondary transport breakdown (`mcp_client_name IN ('openmotion-cli', 'om-cli')` → `cli_bridge`, otherwise `native_mcp`) instead of listing `openmotion-cli` alongside real Agent products. Exclude internal/test probe clients (`openmotion-install-check`, `openmotion-poc-process-test`, `install-probe`, `probe`, `openmotion-smoke`, `om-xuat`) on historical versions prior to `_meta['openmotion/internalProbe']`.
+- **LLM Session traces (`$ai_generation`)**: slice by `trace_surface` (`external_mcp` vs `studio_super_agent`) × `host_agent`, joining distinct `$ai_session_id`, turn counts, `mcp_call_count` / `mcp_failure_count`, `has_completed_export`, `$ai_latency`, and `$ai_input_tokens` / `$ai_output_tokens`.
 
 ## Brand-story discovery and reuse
 
@@ -730,7 +766,7 @@ isolated test-run UUID.
 
 ## Strategy telemetry enrichment and cost-controlled sampling
 
-- **Model Gateway dimensions (`media_generation_submitted` / `media_generation_result`):** Worker events carry `provider_kind` (`builtin | custom | account | agent`), `model_provider` and `model_id` (bounded catalogue model ID allowing up to 4 `/` vendor-path separators within 128 chars, e.g. `fal-ai/flux/schnell`, and omitted when `provider_kind=custom` or `model.source=custom`), `capability_id`, `reference_count`, `duration_ms`, `queue_wait_ms`, `attempt_kind` (`initial | resume | retry_save`), `remote_terminal`, closed `error_code`, and the calling `host_context` persisted on the job. No additional events are emitted.
+- **Unified media generation telemetry (`gateway/media-telemetry.ts`: `media_generation_requested` / `media_generation_rejected` / `media_generation_replayed` / `media_generation_submitted` / `media_generation_retry_started` / `media_generation_retry_rejected` / `media_generation_result`):** Both `ModelGateway` (`executor_kind=gateway`: `image | video | audio`) and `CapabilityCenter` script executors (`executor_kind=script`: `3d-asset`, `3d-world`, and future multi-step scripts) plus pre-gateway entry guards (`/api/generations` and `/api/capabilities/run` 503 Studio-not-open, `requireNativeRuntime` missing, and pre-submit capability validation failures) share one unified telemetry recorder and closed conservation funnel (`requested = submitted + rejected + replayed` globally, per `modality`, per `executor_kind`, and per `entry_surface`, subject to normal process lifecycle; concurrent in-process waiters on a failing script run close their `requested` with `media_generation_rejected` so only the primary execution records the `media_generation_result` failure). Events are joined by a generated `request_id` UUID (persisted internally as `telemetryRequestId`, never the caller's `idempotencyKey`), plus per-attempt `attempt_id` and `attempt_number` across `initial | resume | retry_save`. Failed `resume` / `retry_save` preflight calls emit `media_generation_retry_rejected` (including entry-level missing/invalid `requestId` checks when the job is resolved). Events carry `executor_kind` (`gateway | script`), `modality` (`image | video | audio | 3d`), `spatial_kind` (`asset | world`, 3D only), `pipeline_step` (`base | rig | retarget | postprocess | world`, 3D multi-step tasks), `provider_kind` (`builtin | custom | account | agent`), `route_channel` (`amr_account | amr_opendesign | byok_builtin | byok_agent | byok_custom`), `model_provider` and `model_id` (omitted when `provider_kind=custom` or `model.source=custom`; spatial scripts restrict `model_id` to approved built-in spatial models only and persist sanitized attribution for replays), `capability_id` (restricted to the closed built-in allowlist; unrecognized values map to `other`), `entry_surface` (`studio | mcp_media_use | mcp_assets_use | mcp_capability_run | scenario | unknown`), `destination` (`library | project`), `generation_mode` (including 3D/world modes `text-to-3d | image-to-3d | rig-3d | retarget-3d | edit-3d | text-to-world | image-to-world | edit-world`), `audio_kind` (`speech | music | sfx | other`), `reference_count` (including `parameters.images`), `is_edit`, bounded `account_plan`, bounded requested media parameters (`requested_duration_sec`, `requested_aspect_ratio`, `requested_resolution`, `requested_audio`), `queue_depth`, mutually exclusive stage timings (`duration_ms`, `queue_wait_ms`, `end_to_end_ms`, `upload_ms`, `remote_ms`, `download_ms`, `save_ms`, `cancel_wait_ms`), `has_remote_id`, `remote_terminal`, `is_resumable`, `save_pending`, `reconnected_count`, `total_output_bytes`, closed `failure_phase`, `phase_before_cancel`, `last_active_phase`, `cancel_source`, integer `http_status` (`100..599`, only for actual HTTP responses), closed-allowlist `upstream_error_code` (including AMR codes `provider_concurrency_exceeded`, `upstream_rate_limited`, `upstream_request_failed`, `upstream_provider_forbidden`, `audio_outcome_unknown`; unknown values map to `other`; omitted for custom providers and local errno errors), closed `error_code` (including `CONTENT_BLOCKED` for content-safety rejections), channel-aware `error_category` (separating AMR `commercial_gate` from BYOK `byok_billing`, `auth_credential`, `rate_limit`, `content_policy`, `timeout` — including both local deadline timeouts, subprocess kill timeouts, and remote provider `timeout` task states — `provider_unavailable`, `upstream_error`, `network_download`, `media_invalid`, `local_storage`, `client_interrupted`, and `user_cancelled`), `previous_error_code` / `previous_failure_phase` on retries, and the calling `host_context` persisted on the job. Pre-generation MCP tool events (`mcp_tool_started/finished`) also carry optional `modality` (`image | video | audio | 3d`); `upgrade_link_result` carries `image | video | audio`.
 - **Capability Center dimensions (`mcp_tool_started/finished`, `webmcp_tool_started/finished`, `asset_generation_submit_result`):** Tool events extract `capability_id` (registry slug or `other`), `executor_kind` (`model | prompt-preset | dedicated-model | service | script`), `dry_run`, and `fallback_raw_model` without adding separate events or reporting prompts/options.
 - **Template & Host attribution (`work_generation_stage`, `project_create_result`):** `WorkRound` persists the initiating `host_context` and reads `project.templateId` from the workspace catalog to emit `template_id` and `attribution_source` (`project_catalog | none`) alongside `host_context` across `started`, `generated`, `edited` and `exported`.
 - **Super Agent & Scenario Workflows terminal events:** `super_agent_turn_result`, `super_agent_approval_result`, `super_agent_turn_feedback`, `scenario_run_result` and `scenario_step_result` emit once per committed milestone under anonymous worker ingestion (`$process_person_profile=false`). Idempotent replays never emit duplicate events; prompts, replies, briefs, titles, paths, raw error text and free-text feedback notes are excluded (`super_agent_turn_feedback` sends only closed rating/transition/scene/reason-tag dimensions plus `has_note` and `note_length`).

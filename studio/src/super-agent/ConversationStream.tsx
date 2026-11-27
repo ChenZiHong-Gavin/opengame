@@ -1946,6 +1946,7 @@ export function ConversationStream({
           )}
           <GamePublishThread
             chatId={chat?.id}
+            messages={displayChat?.messages}
             onOpenPanel={artifactId => {
               onOpenArtifactId(artifactId);
               gamePublishActions.reopen(artifactId);

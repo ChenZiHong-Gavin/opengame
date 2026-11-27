@@ -25,7 +25,7 @@ test('presentation documents and game template content skip product regressions'
   });
   assert.equal(classifyChanges(['templates/games/racer/game.js', 'game-projects.ts']).full, true);
   for (const file of [
-    'skills/openmotion-director/SKILL.md', 'skills/openmotion-production/references/native.md',
+    'skills/openmotion-video/SKILL.md', 'skills/openmotion-video/references/shared/native.md',
     'install.md', 'docs/install.md', 'docs/npm-installation.md', 'AGENTS.md', 'CLAUDE.md',
     'docs/examples/product-launch.MOTION.md', 'examples/demo/README.md',
     'docs/readme/hero.png', 'library/templates/catalog/demo/guide.md', 'unknown.md',
@@ -39,7 +39,7 @@ test('code, dependency and analysis configuration changes retain maintainability
     '.github/maintainability/jscpd.json', '.github/workflows/ci.yml']) {
     assert.equal(classifyChanges([file]).maintainability, true, file);
   }
-  assert.equal(classifyChanges(['skills/openmotion-director/SKILL.md']).maintainability, false);
+  assert.equal(classifyChanges(['skills/openmotion-video/SKILL.md']).maintainability, false);
   assert.equal(classifyChanges(['docs/readme/live-product/manifest.json']).maintainability, false);
 });
 
@@ -118,6 +118,9 @@ test('OpenGame CI covers source and runtime regressions independently of OpenMot
   assert(platformReliability.includes("if: github.event_name != 'pull_request'"));
   assert(!stepBody(checks, 'Scan tracked source without publication credentials').includes('if:'));
   assert(!checks.includes('lfs pull'), 'Source checks must not download LFS media');
+  const mediaStep = stepBody(distribution, 'Download regression media');
+  assert(!mediaStep.includes('templates/games'), 'Runtime CI must not pull all on-demand game template LFS assets');
+  assert(mediaStep.includes('--include="docs/readme/**,library/**,examples/**"'), 'LFS pull must stay aligned with the cached media-key trees');
   for (const command of ['scripts/package-npm.mjs', 'scripts/test-package.mjs', 'tests/npm-package.test.ts',
     'tests/packaged-game-download.mjs', 'tests/npm-installer.test.ts', 'tests/install-guide.test.ts', 'tests/stable-release.test.mjs']) {
     assert(!runCommands(ci).includes(command), `OpenGame CI must not validate the OpenMotion installer: ${command}`);

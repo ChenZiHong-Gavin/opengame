@@ -22,7 +22,7 @@ import { planMediaEntitlement } from './account-media.ts';
 import { registeredProvider } from '../shared/provider-registry.ts';
 import { defaultVideoAudioEnabled, resolveGenerationParameters } from '../shared/generation-options.ts';
 import { isSfxModel } from '../shared/audio-kind.ts';
-import { apiJson, MAX_MEDIA_BYTES, ProviderError, readCappedBytes, retryRead, streamMedia, type Fetcher } from './network.ts';
+import { apiJson, MAX_MEDIA_BYTES, ProviderError, readCappedBytes, retryRead, streamMedia, withErrorMeta, type Fetcher } from './network.ts';
 import { cloudImageParameters, mediaSubmitHeaders, productionApi, uploadInputs } from './opendesign.ts';
 import type { ProviderContext } from './providers.ts';
 import { resumableDownload, type DownloadProgress } from './resumable-download.ts';
@@ -161,6 +161,7 @@ const requestMessages: Record<string, string> = {
   model_access_denied: 'Your OpenDesign plan does not include this model. Choose another model or upgrade your plan.',
   insufficient_balance: 'Your OpenDesign balance is too low for this request. Top up, then try again.',
   tier_limit_exceeded: 'OpenDesign media rate or concurrency limit reached. Wait for running tasks to finish, then try again.',
+  video_concurrency_limit_exceeded: 'OpenDesign media rate or concurrency limit reached. Wait for running tasks to finish, then try again.',
   provider_error: 'The model provider could not complete this request. Try again later or choose another model.',
   request_state_unknown: 'OpenDesign could not confirm whether this request ran, so it was not resubmitted. Check your OpenDesign history before retrying.',
   media_execution_unknown: 'OpenDesign could not confirm whether this request ran, so it was not resubmitted. Check your OpenDesign history before retrying.',
@@ -183,7 +184,8 @@ export const accountMediaMessages = [...new Set([...Object.values(requestMessage
 export class AccountRequestError extends Error {
   readonly status?: number;
   readonly code?: string;
-  constructor(stderr: string) {
+  readonly upstreamCode?: string;
+  constructor(stderr: string, options?: { cause?: unknown; media?: boolean }) {
     let parsedEnvelope: { status?: number; code?: string } | undefined;
     try {
       const parsed: unknown = JSON.parse(stderr.trim());
@@ -203,15 +205,19 @@ export class AccountRequestError extends Error {
       // Plain-text Vela stderr falls through to regex parsing below.
     }
     // Generic API errors read `API request failed with status 403: code`; media commands read `<text> (code, HTTP 400)`.
-    const api = /API request failed with status (\d{3})(?:: ([a-z0-9_]{1,64})(?=\s|$))?/.exec(stderr);
+    const api = /API request failed with status (\d{3})(?:: ([A-Za-z0-9_]{1,64})(?=\s|$))?/.exec(stderr);
     // A response without a JSON body has an empty code: `(, HTTP 502)`.
     const media = parsedEnvelope || api ? undefined : [...stderr.matchAll(/\(([^,()]{0,64}), HTTP (\d{3})\)/g)].at(-1);
     const status = parsedEnvelope?.status ?? (api ? Number(api[1]) : media ? Number(media[2]) : undefined);
-    const code = parsedEnvelope?.code ?? (api ? api[2] : media && /^[a-z0-9_]{1,64}$/.test(media[1]) ? media[1] : undefined);
+    const code = parsedEnvelope?.code ?? (api ? api[2] : media && /^[A-Za-z0-9_-]{1,64}$/.test(media[1]) ? media[1] : undefined);
     // Local CLI flag/argument rejections exit without an HTTP status; do not misreport them as connection or sign-in failures.
     const cliInvalid = !status && !code && /(?:^|\n)Error: (?:if any flags in the group |unknown (?:shorthand )?flag:|invalid argument |required flag\(s\) |flag needs an argument:)/.test(stderr);
-    super((code && requestMessages[code]) || (cliInvalid ? requestMessages.invalid_request : status === 401 ? requestMessages.unauthorized : status ? jobMessages.service : jobMessages.connection));
-    this.status = status; this.code = code;
+    const isMediaRequest = options?.media ?? Boolean(media);
+    super(
+      (code && requestMessages[code]) || (cliInvalid ? requestMessages.invalid_request : status === 401 ? requestMessages.unauthorized : status === 429 && isMediaRequest ? requestMessages.tier_limit_exceeded : status ? jobMessages.service : jobMessages.connection),
+      options?.cause !== undefined ? { cause: options.cause } : undefined,
+    );
+    this.status = status; this.code = code; this.upstreamCode = code;
   }
 }
 class SignInFailure extends Error {
@@ -500,7 +506,8 @@ export class OpenDesignAccount {
       });
       return stdout;
     } catch (error) {
-      throw new AccountRequestError(String((error as { stderr?: unknown }).stderr ?? ''));
+      const mediaCommand = args[0] === 'image' || args[0] === 'video' || args[0] === 'audio' || args[0] === 'media';
+      throw new AccountRequestError(String((error as { stderr?: unknown }).stderr ?? ''), { cause: error, media: mediaCommand });
     }
   }
   async run(args: string[], signal?: AbortSignal, envOverrides?: Record<string, string>) {
@@ -1108,7 +1115,12 @@ export class OpenDesignAccount {
       // The task already exists and may be billed; a failed read or download must not suggest submitting it again.
       const task = JSON.parse(await this.run([kind, 'get', taskId, '--output', output, '--json'], signal).catch(error => {
         // A rejected sign-in still needs its sign-out hint: the account keeps reporting signed-in after a media 401.
-        if (error instanceof AccountRequestError) throw new Error(error.status === 401 || error.code === 'unauthorized' ? jobMessages.resultUnauthorized : jobMessages.resultUnreadable);
+        if (error instanceof AccountRequestError) {
+          throw withErrorMeta(
+            new Error(error.status === 401 || error.code === 'unauthorized' ? jobMessages.resultUnauthorized : jobMessages.resultUnreadable, { cause: error }),
+            { status: error.status, upstreamCode: error.code },
+          );
+        }
         throw error;
       }));
       if (task.task_id !== taskId) throw new Error('Account provider returned an unexpected task');
@@ -1117,7 +1129,12 @@ export class OpenDesignAccount {
         if (!info.isFile() || info.isSymbolicLink() || info.size > 256 * 1024 * 1024) throw new Error('Invalid account media output');
         return [await readFile(output)];
       }
-      if (['failed', 'cancelled', 'canceled'].includes(task.status)) throw new Error(jobMessages.taskFailed);
+      if (['failed', 'cancelled', 'canceled'].includes(task.status)) {
+        await progress('remote_failed');
+        throw withErrorMeta(new Error(jobMessages.taskFailed), {
+          upstreamCode: typeof task.error?.code === 'string' ? task.error.code : undefined,
+        });
+      }
       if (!['queued', 'pending', 'running', 'processing', 'submitted'].includes(task.status)) throw new Error(jobMessages.unknownTaskStatus);
       await progress('generating');
     }
@@ -1125,33 +1142,40 @@ export class OpenDesignAccount {
   private async submitImage(job: GenerationJob, parameters: Record<string, unknown>, references: NonNullable<ProviderContext['references']>, signal: AbortSignal,
     progress: (phase: string) => Promise<void>) {
     const profile = await this.profile();
-    if (!signedInProfile(profile)) throw new Error(requestMessages.unauthorized);
+    if (!signedInProfile(profile)) throw withErrorMeta(new Error(requestMessages.unauthorized), { errorSource: 'local' });
     const fetcher = this.options.fetcher ?? fetch, api = productionApi + '/api/v1/media';
     const headers = { Authorization: `Bearer ${profile!.controlKey}`, 'Content-Type': 'application/json' };
     const images = await uploadInputs(fetcher, api, headers, job.id, { references, progress, signal }).catch(error => {
-      const status = (error as { status?: number }).status;
-      if (status === 401 || status === 403) throw new Error(requestMessages.unauthorized);
-      if (status === 413) throw new Error(requestMessages.asset_too_large);
-      throw error instanceof ProviderError ? new Error(jobMessages.service) : error;
+      // Only AMR API rejections (ProviderError) map to account messages; presigned storage PUT failures stay storage errors.
+      if (error instanceof ProviderError) {
+        if (error.status === 401 || error.status === 403) throw withErrorMeta(new Error(requestMessages.unauthorized), { status: error.status, upstreamCode: error.upstreamCode, errorSource: 'api' });
+        if (error.status === 413) throw withErrorMeta(new Error(requestMessages.asset_too_large), { status: error.status, upstreamCode: error.upstreamCode ?? 'asset_too_large', errorSource: 'api' });
+        throw withErrorMeta(new Error(jobMessages.service), { status: error.status, upstreamCode: error.upstreamCode, errorSource: 'api' });
+      }
+      throw error;
     });
+    await progress('submitting');
     let response: Response;
     try {
       response = await fetcher(api + (images.length ? '/images/edits' : '/images/generations'), {
         method: 'POST', headers: { ...headers, ...mediaSubmitHeaders(productionApi, job.id) }, redirect: 'error', signal,
         body: JSON.stringify({ ...cloudImageParameters(parameters), model: job.model.modelId, prompt: job.prompt, ...(images.length ? { images } : {}) }),
       });
-    } catch (error) { if (signal.aborted) throw error; throw new Error(jobMessages.connection); }
+    } catch (error) { if (signal.aborted) throw error; throw new Error(jobMessages.connection, { cause: error }); }
     // Only the service error code is kept; the response text can echo the prompt.
-    const body = await response.json().catch(() => undefined) as { task_id?: unknown; error?: { code?: unknown }; code?: unknown } | undefined;
+    const body = await response.json().catch(() => undefined) as { task_id?: unknown; error?: string | { code?: unknown }; code?: unknown } | undefined;
     if (!response.ok) {
-      const code = String(body?.error?.code ?? body?.code ?? '');
-      throw new Error((Object.hasOwn(requestMessages, code) ? requestMessages[code] : undefined) ?? (response.status === 401 ? requestMessages.unauthorized : jobMessages.service));
+      const code = typeof body?.error === 'string' ? body.error : String(body?.error?.code ?? body?.code ?? '');
+      throw withErrorMeta(
+        new Error((Object.hasOwn(requestMessages, code) ? requestMessages[code] : undefined) ?? (response.status === 401 ? requestMessages.unauthorized : response.status === 429 ? requestMessages.tier_limit_exceeded : jobMessages.service)),
+        { status: response.status, upstreamCode: code || undefined, errorSource: 'api' },
+      );
     }
     return body ?? {};
   }
   private async submitSoundEffect(job: GenerationJob, parameters: Record<string, unknown>, signal: AbortSignal) {
     const access = await this.controlAccess();
-    if (!access) throw new Error(requestMessages.unauthorized);
+    if (!access) throw withErrorMeta(new Error(requestMessages.unauthorized), { errorSource: 'local' });
     const fetcher = this.options.fetcher ?? fetch, api = access.baseUrl + '/api/v1/media';
     const headers = { Authorization: `Bearer ${access.key}`, 'Content-Type': 'application/json' };
     let response: Response;
@@ -1160,11 +1184,14 @@ export class OpenDesignAccount {
         method: 'POST', headers: { ...headers, ...mediaSubmitHeaders(access.baseUrl, job.id) }, redirect: 'error', signal,
         body: JSON.stringify({ model: job.model.modelId, parameters: { ...parameters, text: job.prompt } }),
       });
-    } catch (error) { if (signal.aborted) throw error; throw new Error(jobMessages.connection); }
-    const body = await response.json().catch(() => undefined) as { task_id?: unknown; error?: { code?: unknown }; code?: unknown } | undefined;
+    } catch (error) { if (signal.aborted) throw error; throw new Error(jobMessages.connection, { cause: error }); }
+    const body = await response.json().catch(() => undefined) as { task_id?: unknown; error?: string | { code?: unknown }; code?: unknown } | undefined;
     if (!response.ok) {
-      const code = String(body?.error?.code ?? body?.code ?? '');
-      throw new Error((Object.hasOwn(requestMessages, code) ? requestMessages[code] : undefined) ?? (response.status === 401 ? requestMessages.unauthorized : jobMessages.service));
+      const code = typeof body?.error === 'string' ? body.error : String(body?.error?.code ?? body?.code ?? '');
+      throw withErrorMeta(
+        new Error((Object.hasOwn(requestMessages, code) ? requestMessages[code] : undefined) ?? (response.status === 401 ? requestMessages.unauthorized : response.status === 429 ? requestMessages.tier_limit_exceeded : jobMessages.service)),
+        { status: response.status, upstreamCode: code || undefined, errorSource: 'api' },
+      );
     }
     return body ?? {};
   }
@@ -1173,7 +1200,7 @@ export class OpenDesignAccount {
     const read = async () => {
       if (job.providerOrigin !== await this.identity()) throw new Error(jobMessages.accountChangedAfterSubmit);
       const access = await this.controlAccess();
-      if (!access) throw new Error(jobMessages.resultUnauthorized);
+      if (!access) throw withErrorMeta(new Error(jobMessages.resultUnauthorized), { errorSource: 'local' });
       try {
         const task = await retryRead(() => apiJson(this.options.fetcher ?? fetch,
           `${access.baseUrl}/api/v1/media/audio/tasks/${encodeURIComponent(taskId)}`,
@@ -1182,8 +1209,10 @@ export class OpenDesignAccount {
         if (task.task_id !== taskId || task.model && task.model !== job.model.modelId) throw new Error(jobMessages.resultUnreadable);
         return task;
       } catch (error) {
-        if ((error as { status?: number }).status === 401) throw new Error(jobMessages.resultUnauthorized);
-        throw new Error(jobMessages.resultUnreadable);
+        const status = (error as { status?: number }).status;
+        const upstreamCode = (error as { upstreamCode?: string }).upstreamCode;
+        if (status === 401) throw withErrorMeta(new Error(jobMessages.resultUnauthorized, { cause: error }), { status, upstreamCode, errorSource: 'api' });
+        throw withErrorMeta(new Error(jobMessages.resultUnreadable, { cause: error }), { status, upstreamCode, errorSource: status !== undefined ? 'api' : undefined });
       }
     };
     const assetFrom = (task: any) => {
@@ -1196,7 +1225,12 @@ export class OpenDesignAccount {
     let completedTask: any;
     for (;;) {
       const task = await read();
-      if (['failed', 'cancelled', 'canceled'].includes(task.status)) { await progress('remote_failed'); throw new Error(jobMessages.taskFailed); }
+      if (['failed', 'cancelled', 'canceled'].includes(task.status)) {
+        await progress('remote_failed');
+        throw withErrorMeta(new Error(jobMessages.taskFailed), {
+          upstreamCode: typeof task.error?.code === 'string' ? task.error.code : undefined,
+        });
+      }
       if (task.status === 'succeeded') { completedTask = task; break; }
       if (!['queued', 'pending', 'running', 'processing', 'submitted'].includes(task.status)) throw new Error(jobMessages.unknownTaskStatus);
       await progress('generating'); await delay(this.options.pollMs ?? 2000, undefined, { signal });
@@ -1205,17 +1239,23 @@ export class OpenDesignAccount {
     if (typeof initialAsset.size === 'number' && Number.isSafeInteger(initialAsset.size) && initialAsset.size >= 24) {
       return resumableDownload(directory, async () => {
         const task = await read();
-        if (['failed', 'cancelled', 'canceled'].includes(task.status)) { await progress('remote_failed'); throw new Error(jobMessages.taskFailed); }
+        if (['failed', 'cancelled', 'canceled'].includes(task.status)) {
+          await progress('remote_failed');
+          throw withErrorMeta(new Error(jobMessages.taskFailed), {
+            upstreamCode: typeof task.error?.code === 'string' ? task.error.code : undefined,
+          });
+        }
         if (task.status !== 'succeeded') throw new Error(jobMessages.resultUnreadable);
         const resolved = assetFrom(task);
         if (typeof resolved.size !== 'number') throw new Error(jobMessages.resultUnreadable);
         return { ...resolved, size: resolved.size };
       }, signal, download => progress('downloading', undefined, download), this.options.download, 3, 'audio/');
     }
+    await progress('downloading');
     const transport = this.options.download ?? streamMedia;
     const response = await retryRead(async () => {
       const res = await transport(initialAsset.url, { signal });
-      if (!res.ok) throw new ProviderError('Audio download failed', res.status);
+      if (!res.ok) throw new ProviderError('Audio download failed', res.status, undefined, 'download');
       return res;
     }, signal, 3);
     const bytes = await readCappedBytes(response, MAX_MEDIA_BYTES);
@@ -1227,7 +1267,7 @@ export class OpenDesignAccount {
     const read = async () => {
       if (job.providerOrigin !== await this.identity()) throw new Error(jobMessages.accountChangedAfterSubmit);
       const profile = await this.profile();
-      if (!signedInProfile(profile)) throw new Error(jobMessages.resultUnauthorized);
+      if (!signedInProfile(profile)) throw withErrorMeta(new Error(jobMessages.resultUnauthorized), { errorSource: 'local' });
       try {
         const task = await retryRead(() => apiJson(this.options.fetcher ?? fetch,
           `${productionApi}/api/v1/media/images/tasks/${encodeURIComponent(taskId)}`,
@@ -1236,8 +1276,10 @@ export class OpenDesignAccount {
         if (task.task_id !== taskId || task.model && task.model !== job.model.modelId) throw new Error(jobMessages.resultUnreadable);
         return task;
       } catch (error) {
-        if ((error as { status?: number }).status === 401) throw new Error(jobMessages.resultUnauthorized);
-        throw new Error(jobMessages.resultUnreadable);
+        const status = (error as { status?: number }).status;
+        const upstreamCode = (error as { upstreamCode?: string }).upstreamCode;
+        if (status === 401) throw withErrorMeta(new Error(jobMessages.resultUnauthorized, { cause: error }), { status, upstreamCode, errorSource: 'api' });
+        throw withErrorMeta(new Error(jobMessages.resultUnreadable, { cause: error }), { status, upstreamCode, errorSource: status !== undefined ? 'api' : undefined });
       }
     };
     const assetFrom = (task: any) => {
@@ -1249,14 +1291,24 @@ export class OpenDesignAccount {
     };
     for (;;) {
       const task = await read();
-      if (['failed', 'cancelled', 'canceled'].includes(task.status)) { await progress('remote_failed'); throw new Error(jobMessages.taskFailed); }
+      if (['failed', 'cancelled', 'canceled'].includes(task.status)) {
+        await progress('remote_failed');
+        throw withErrorMeta(new Error(jobMessages.taskFailed), {
+          upstreamCode: typeof task.error?.code === 'string' ? task.error.code : undefined,
+        });
+      }
       if (task.status === 'succeeded') break;
       if (!['queued', 'pending', 'running', 'processing', 'submitted'].includes(task.status)) throw new Error(jobMessages.unknownTaskStatus);
       await progress('generating'); await delay(this.options.pollMs ?? 2000, undefined, { signal });
     }
     return resumableDownload(directory, async () => {
       const task = await read();
-      if (['failed', 'cancelled', 'canceled'].includes(task.status)) { await progress('remote_failed'); throw new Error(jobMessages.taskFailed); }
+      if (['failed', 'cancelled', 'canceled'].includes(task.status)) {
+        await progress('remote_failed');
+        throw withErrorMeta(new Error(jobMessages.taskFailed), {
+          upstreamCode: typeof task.error?.code === 'string' ? task.error.code : undefined,
+        });
+      }
       if (task.status !== 'succeeded') throw new Error(jobMessages.resultUnreadable);
       return assetFrom(task);
     }, signal, download => progress('downloading', undefined, download), this.options.download);

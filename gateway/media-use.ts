@@ -289,16 +289,20 @@ export async function mediaUse(
       throw new ToolInputError('provider, model, projectId, requestId, modality and prompt are required', missing ?? 'prompt', 'missing');
     }
     const job = await gateway.submit({ projectId: args.projectId, model: `${args.provider}:${args.model}`, modality: args.modality,
-      prompt: args.prompt, parameters: args.parameters, mode: args.mode, referenceAsset: args.referenceAsset, idempotencyKey: args.requestId } as GenerateInput, host);
+      prompt: args.prompt, parameters: args.parameters, mode: args.mode, referenceAsset: args.referenceAsset, idempotencyKey: args.requestId } as GenerateInput, host, { entrySurface: 'mcp_media_use' });
     return { projectId: job.projectId, job, next: { action: 'status', projectId: job.projectId, jobId: job.id } };
   }
   if (args.action === 'status' || args.action === 'cancel' || args.action === 'retry_save' || args.action === 'resume') {
     const job = await gateway.getJob(args.jobId);
     if (job.projectId !== args.projectId || job.model.provider === 'codex') throw new Error('GENERATION_NOT_FOUND: job does not belong to this project');
-    if (args.action !== 'status' && !args.requestId) throw new ToolInputError('requestId is required', 'requestId', 'missing');
+    if (args.action !== 'status' && !args.requestId) {
+      const err = new ToolInputError('requestId is required', 'requestId', 'missing');
+      if (args.action === 'resume' || args.action === 'retry_save') gateway.recordRetryRejection(job, args.action, err);
+      throw err;
+    }
     if (args.action === 'resume') return { projectId: job.projectId, job: await gateway.resume(job.id, args.requestId) };
     if (args.action === 'retry_save') return { projectId: job.projectId, job: await gateway.retrySave(job.id) };
-    if (args.action === 'cancel') return { projectId: job.projectId, job: await gateway.cancel(job.id) };
+    if (args.action === 'cancel') return { projectId: job.projectId, job: await gateway.cancel(job.id, { source: 'mcp' }) };
     const topupFields = await balanceLowTopupForJob(gateway, job, {
       channel,
       mcpChannel,

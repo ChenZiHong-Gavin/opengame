@@ -121,7 +121,7 @@ export async function setup(options) {
         const pkg = await readJSON(path.join(temporary, 'package.json'));
         assert.equal(pkg?.version, manifest.version, 'Application version does not match manifest');
         if (manifest.templateEnvironment) assert.equal((await readJSON(path.join(temporary, 'shared/template-config.json')))?.environment, templateEnvironment, 'Application template environment does not match manifest');
-        for (const file of ['mcp.ts', 'scripts/npm-runtime.mjs', 'studio/build/index.html', 'skills/openmotion-production/SKILL.md']) await readFile(path.join(temporary, file));
+        for (const file of ['mcp.ts', 'scripts/npm-runtime.mjs', 'studio/build/index.html', 'skills/openmotion-video/SKILL.md']) await readFile(path.join(temporary, file));
         assert(!contains(temporary, process.execPath), 'Node must remain external to the lightweight application');
         const npm = process.env.npm_execpath || path.join(path.dirname(process.execPath), process.platform === 'win32' ? 'node_modules/npm/bin/npm-cli.js' : '../lib/node_modules/npm/bin/npm-cli.js');
         if (manifest.bundledDependencies) {
@@ -261,23 +261,26 @@ export function directAccess(home, host, appRoot, options = {}) {
 }
 
 async function installedConnection(options) {
-  const host = options.host || 'codex';
   const environment = (await readJSON(bundledManifest))?.templateEnvironment;
   const home = await canonical(options.home || defaultHome(environment));
   const state = await readJSON(path.join(home, 'install.json'));
   assert(state?.managedBy === managedBy, 'Run setup for the selected host and installation home first.');
+  const installedHosts = Object.keys(state.hosts ?? {});
+  const soleHost = installedHosts.length === 1 ? installedHosts[0] : undefined;
+  const host = options.host || soleHost || 'codex';
   assert(Object.hasOwn(state.hosts ?? {}, host) || host === 'codex' && state.skillsDirectory, 'This installation is not registered for the selected host.');
   const saved = Object.hasOwn(state.hosts ?? {}, host) ? state.hosts[host] : undefined;
   try {
-    const plan = await hostPlan({ ...options, skillsDirectory: saved?.skillsDirectory, profile: options.profile || saved?.profile }, home, state.launcher, state);
+    const plan = await hostPlan({ ...options, host, skillsDirectory: saved?.skillsDirectory, profile: options.profile || saved?.profile }, home, state.launcher, state);
     const connection = plan.readConnection ? await plan.readConnection() : plan.connection;
-    return { state, connection, home, host };
+    return { state, connection, home, host, soleHost };
   } catch (error) { error.stage = 'host_configuration'; throw error; }
 }
 
 export async function callInstalled(options, name, args = {}) {
-  const { state, connection } = await installedConnection(options);
-  return installedTool(state, connection, name, args);
+  const { state, connection, soleHost } = await installedConnection(options);
+  const resolvedHost = options?.host ?? soleHost;
+  return installedTool(state, connection, name, args, undefined, { host: resolvedHost });
 }
 
 export async function diagnose(options) {

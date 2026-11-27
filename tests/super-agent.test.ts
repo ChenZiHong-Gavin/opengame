@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { designHttp, designProjectsFor } from '../design-projects.ts';
-import { gameHttp, gameProjectsFor } from '../game-projects.ts';
+import { GameProjects, gameHttp, gameProjectsFor } from '../game-projects.ts';
 import { injectPreviewBridgeHtml, isValidPreviewBridgeToken } from '../shared/preview-bridge.ts';
 import { Phase1Service } from '../phase1.ts';
 import { AssetLibrary } from '../gateway/asset-library.ts';
@@ -181,6 +181,55 @@ test('SuperAgentConversations persists CRUD state, recovers interrupted runs, an
   await reloaded.remove(created.id);
   await assert.rejects(() => reloaded.get(created.id), /CONVERSATION_NOT_FOUND/);
   await reloaded.close();
+  await service.close();
+}));
+
+test('SuperAgentConversations finds exact game chats before limiting and ranks the original game chat first', () => fixture(async store => {
+  const service = new SuperAgentConversations(store);
+  const directory = path.join(store.directory, 'super-agent', 'chats');
+  await mkdir(directory, { recursive: true });
+  const gameId = 'sling-siege';
+  const title = 'Sling Siege';
+  const artifact = (projectId: string, createdAt: number): SuperAgentChat['artifacts'][number] => ({
+    id: `game:${projectId}`, kind: 'game-project', projectId, title, createdAt, updatedAt: createdAt,
+  });
+  const prompt = (id: string, attachmentId: string): SuperAgentChat['messages'][number] => ({
+    id, role: 'user', text: 'Open the game', createdAt: 10,
+    attachments: [{ id: attachmentId, kind: 'game-project', title }],
+  });
+  const persist = async (overrides: Partial<SuperAgentChat>) => {
+    const id = crypto.randomUUID();
+    const chat: SuperAgentChat = {
+      id, title, intent: 'game', engine: 'codex', permissionMode: 'auto', state: 'idle',
+      messages: [], artifacts: [], approvals: [], createdAt: 1, updatedAt: 1,
+      ...overrides,
+    };
+    await writeFile(path.join(directory, `${id}.json`), JSON.stringify(chat));
+    return id;
+  };
+
+  const [original, olderFallback, newerFallback, newerPreview] = await Promise.all([
+    persist({ createdAt: 10, updatedAt: 32, artifacts: [artifact(gameId, 32)], messages: [prompt('first', gameId)] }),
+    persist({ createdAt: 12, updatedAt: 100, artifacts: [artifact(gameId, 20)] }),
+    persist({ createdAt: 15, updatedAt: 105, artifacts: [artifact(gameId, 20)] }),
+    persist({
+      createdAt: 5, updatedAt: 500, pinned: true, artifacts: [artifact(gameId, 42)],
+      messages: [prompt('first', 'other-game'), prompt('later', gameId)],
+    }),
+    persist({ createdAt: 50, updatedAt: 600, artifacts: [artifact('other-game', 55)] }),
+    ...Array.from({ length: 200 }, (_, index) => persist({ createdAt: 1_000 + index, updatedAt: 1_000 + index })),
+  ]);
+
+  const unfiltered = await service.list();
+  assert.equal(unfiltered.length, 200);
+  assert.ok(!unfiltered.some(chat => chat.id === original));
+  const gameChats = await service.list(gameId);
+  assert.equal(gameChats.length, 4);
+  assert.deepEqual(gameChats.map(chat => chat.id), [original, olderFallback, newerFallback, newerPreview]);
+
+  const response = await transport(store)(`/motion-api/super-agent/chats?${new URLSearchParams({ gameId })}`);
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).conversations, gameChats);
   await service.close();
 }));
 
@@ -1304,7 +1353,32 @@ test('game generation suppresses premature starter-kit artifacts during building
 }));
 
 test('built-in template zero-rebuild delivery presents game artifact immediately and preserves localized title across concurrent set_status', () => fixture(async store => {
-  const games = gameProjectsFor(store.directory);
+  const fixtureTemplates = path.join(store.directory, 'fixture-templates');
+  const templateDir = path.join(fixtureTemplates, 'ball-match');
+  await mkdir(templateDir, { recursive: true });
+  await writeFile(path.join(templateDir, 'index.html'), '<!doctype html><title>Jelly Ball Chain Pop</title>');
+  await writeFile(path.join(templateDir, 'cover.webp'), 'fake-webp');
+  await writeFile(path.join(templateDir, 'game.json'), JSON.stringify({
+    id: 'ball-match',
+    title: 'Jelly Ball Chain Pop',
+    description: 'Trace glossy chains across a 3D bubble grid.',
+    genre: 'casual',
+    style: '3d',
+    setting: 'modern',
+    multiplayer: false,
+    maxPlayers: 1,
+    status: 'published',
+    cover: 'cover.webp',
+    entry: 'index.html',
+    controls: 'Drag through adjacent balls.',
+    plays: 0,
+    likes: 0,
+    dislikes: 0,
+    createdAt: '2026-11-24T00:00:00.000Z',
+    updatedAt: '2026-11-24T00:00:00.000Z',
+    orientation: 'portrait',
+  }));
+  const games = new GameProjects(store.directory, fixtureTemplates);
   const remixed = await games.remix('ball-match');
   assert.equal(remixed.game.title, 'Jelly Ball Chain Pop');
   assert.equal(remixed.game.status, 'draft');

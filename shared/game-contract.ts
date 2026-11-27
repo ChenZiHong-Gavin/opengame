@@ -121,6 +121,136 @@ export function isReadyBuiltInTemplate(
   return !game.external && game.source === 'template' && (game.status === 'ready' || game.status === 'published');
 }
 
+/**
+ * Curated default display order for the Top-100 flagship TOP赚钱 mini-game templates when play counts are tied.
+ * Balances high-recognition viral genres across 20 rows (~5 screenfuls) so discovery leads with proven hits
+ * backed by upgraded full-bleed covers and hover preview clips instead of arbitrary A-Z folder names.
+ */
+export const CURATED_TOP_EARNING_ORDER: readonly string[] = [
+  // Tier 1 (Top 1–30): First-fold viral blockbusters & 3D showcase hits
+  'catch-goose-3d',
+  'plants-vs-zombies',
+  'archero-bow-legend',
+  'billiards-3d-pro',
+  'screw-puzzle',
+  'fruit-slash-frenzy',
+  'tile-stack',
+  'dream-kitchen-chef',
+  'watermelon-merge-3d',
+  'beach-soccer-pro',
+  'haunted-dorm-clash',
+  'big-hero-squad',
+  'backpack-hero',
+  'bear-dash-runner',
+  'arrow-out-3d',
+  'hoop-dunk-master',
+  '3d-mahjong',
+  'zuma-marble-blast',
+  'bus-queue-sort',
+  'heroes-tactics-war',
+  'block-blast',
+  'billiards-trick-shot',
+  'monkey-mart-idle',
+  'assault-duel-combat',
+  'parking-jam-hero',
+  'battle-cats-clash',
+  'knit-yarn-unravel',
+  'human-cannon-blast',
+  'dungeon-escape-horde',
+  'apex-drift-3d',
+
+  // Tier 2 (Top 31–65): High-recognition mini-game classics & second-fold hits
+  'save-the-dog',
+  'gold-miner',
+  'goods-sort-master',
+  'doomsday-survivor',
+  'supermarket-tycoon',
+  'sand-tetris',
+  'crowd-rush-3d',
+  'water-sort-puzzle',
+  'zombie-siege-3d',
+  'cut-the-rope-mini',
+  'rope-untangle-3d',
+  'knife-throw-frenzy',
+  'candy-match',
+  'dino-island-3d',
+  'jump-jump-3d',
+  'life-restart-sim',
+  'cube-chain-2048',
+  'drift-king-rush',
+  'yarn-sort-color',
+  'merge-plants-zombies',
+  'earn-100-million',
+  'chinese-chess-solo',
+  'car-klotski-3d',
+  'alien-sniper-3d',
+  'garden-makeover-match',
+  'mermaid-pin-rescue',
+  'blade-spin-survivor',
+  'blossom-bloom-match',
+  'five-star-clinic',
+  'flappy-pixel-bird',
+  'catch-piggy',
+  'happy-glass-draw',
+  'battle-cars-arena',
+  'my-burger-bistro',
+  'magic-tower-rpg',
+
+  // Tier 3 (Top 66–100): Polished 3D action, cozy tycoons, & evergreen puzzle/board staples
+  'gomoku-ai-pro',
+  'breakout-siege-3d',
+  'button-cut-200',
+  'kitty-snack-shop',
+  'hanzi-meme',
+  'corgi-dash-run',
+  'tetris-blast-boom',
+  'ace-archer-3d',
+  'doctor-sim-3d',
+  'classic-sudoku-pro',
+  'bullet-storm-horde',
+  'fruit-bubble-pop',
+  'piggy-escape-jam',
+  'master-chef-bistro',
+  'ludo-aero-chess',
+  'blade-clash-arena',
+  'lipstick-pin-hit',
+  'boba-tea-adventure',
+  'merge-tower-defense',
+  'fire-water-duo',
+  'tower-stack-3d',
+  'pinball-bricks-2999',
+  'monkey-dash-3d',
+  'ceo-comeback-sim',
+  'number-link-2248',
+  'catch-kitty-3d',
+  'pixel-air-strike',
+  'pipe-twist-flow',
+  'mahjong-kong-pop',
+  'master-hunter-3d',
+  'ring-stack-match',
+  'daily-drift-3d',
+  'ball-laser-bounce',
+  'imperial-palace-merge',
+  'one-stroke-dots',
+];
+
+const curatedOrderIndex = new Map(CURATED_TOP_EARNING_ORDER.map((id, index) => [id, index]));
+
+/** Canonical catalog sort: published first, then play count descending, then curated flagship order, then id. */
+export function compareGameCatalogOrder(
+  a: Pick<GameCard, 'id' | 'plays'> & { status?: GameStatus },
+  b: Pick<GameCard, 'id' | 'plays'> & { status?: GameStatus },
+): number {
+  const pubDiff = Number(b.status === 'published') - Number(a.status === 'published');
+  if (pubDiff !== 0) return pubDiff;
+  const playDiff = (b.plays ?? 0) - (a.plays ?? 0);
+  if (playDiff !== 0) return playDiff;
+  const rankA = curatedOrderIndex.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+  const rankB = curatedOrderIndex.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+  if (rankA !== rankB) return rankA - rankB;
+  return a.id.localeCompare(b.id);
+}
+
 const PORTRAIT_BRIEF_MARKER = 'Layout: portrait 9:16 phone game.';
 const PORTRAIT_BRIEF_SUFFIX = `${PORTRAIT_BRIEF_MARKER} Design every screen, HUD and control for a phone held upright (390×844); in a landscape window, centre the 9:16 play area and letterbox the sides.`;
 const PLAYABLE_AD_BRIEF_MARKER = 'Format: playable ad. Follow the playable-ad recipe';
@@ -179,4 +309,4 @@ export type RoomServerMessage =
   | { type: 'over'; winners?: string[] }
   | { type: 'error'; message: string };
 
-export const gameAssetInstructions = 'Follow openmotion-media routing in openmotion://workflow/game/start for every Game Studio project unless the user explicitly requested pure-code / zero-asset output: even when the user does not explicitly mention AI assets, default to elevating game quality with multimodal models (focal images, sprites/portraits, seamless PBR textures, looping BGM/voice/signature SFX audio, and for 3D briefs clean isolated concept or orthographic 3-view turnaround images into Image-to-3D when live 3D capability is available — prioritizing P0 near-camera focal subjects such as player hero/vehicle, primary boss/rival, signature weapon, plus 1–2 reusable foreground props over peripheral background decor). Always run read-only live capability discovery first via openmotion_capability_discover (including sound-effects, 3d-asset, 3d-world when active) or openmotion_media_use (action="inspect" passing modality for each planned asset type — e.g. "image" for visuals/textures/3-view sheets and "audio" for BGM/SFX/voice — then models with refresh:true and reference, including checking live "3d" capability on 3D briefs). Prefer usable signed-in OpenDesign models (mediaEntitlement "included" or signed-in "unknown", not "not-included") or configured BYOK providers. When planned image, audio, or video generation has no fitting usable provider for that modality (even if the user did not explicitly ask for AI assets): if the user is signed out with no usable API key (agent_media_signed_out), you MUST call openmotion_open_preview with the modality-scoped settingsHandoff from openmotion_media_use(action="inspect", modality=...) to open/return the OpenDesign sign-in page and guide the user to sign in (or configure an API key); if the user is signed in without a multimodal subscription (Free/Go mediaEntitlement "not-included", entry agent_media_upgrade_free / agent_media_upgrade_go), you MUST call openmotion_open_preview with that settingsHandoff (and present upgrade.url if returned) and explicitly inform the user that multimodal generation requires subscribing to OpenDesign Plus (or saving an API key); if a saved API key was rejected (agent_media_key_rejected), call openmotion_open_preview with settingsHandoff and ask them to replace the key. Pause in one turn with two clear choices: (1) sign in / subscribe to OpenDesign Plus (or save an API key) and reply to continue with AI multimodal assets, or (2) build a playable code-placeholder prototype first (procedural visuals plus WebAudio SFX/BGM). Fall back to procedural/CC0 art and WebAudio BGM/SFX only if the user chooses option (2), declines generation, or explicitly requested pure-code output (or for the 3D mesh step alone when no live 3D model is yet available on the platform, while still running image/audio discovery and onboarding normally). Do not pre-block Plus+ accounts on cached hasBalance; if a real generation request fails with insufficient balance / balance is too low, stop without retrying, call openmotion_open_preview(target="providers", entry="agent_media_balance_low"), and ask the user to top up and reply to resume. When usable models are ready, obtain one batched spend-consent check when required (skip if already granted or managed by Studio/host generation consent settings; stop after PLAN + that consent question if waiting), submit concurrently via openmotion_capability_run or openmotion_assets_use(action="generate") for planned focal visuals, textures/3-view sheets, 3D assets, and looping BGM/SFX, author game logic/UI while jobs run, inspect via batch read, and embed literal /motion-api/assets/<assetId>/versions/<versionId>/media URLs (or import local .glb models into the asset library).';
+export const gameAssetInstructions = 'Follow openmotion-media routing in openmotion://workflow/game/start for every Game Studio project unless the user explicitly requested pure-code / zero-asset output: even when the user does not explicitly mention AI assets, default to elevating game quality with multimodal models (focal images, sprites/portraits, seamless PBR textures, looping BGM/voice/signature SFX audio, and for 3D briefs clean isolated concept or orthographic 3-view turnaround images into Image-to-3D when live 3D capability is available — prioritizing P0 near-camera focal subjects with operation="rig_retarget" (multi-clip rigPreset "mixamo-combat"/"mixamo-locomotion", or 1-step operation="retarget" on existing rigTaskId) + vendor/HumanoidRigController.js for animated humanoids, plus signature weapon and 1–2 reusable foreground props over peripheral decor). Always run read-only live capability discovery first via openmotion_capability_discover (including sound-effects, 3d-asset, 3d-world when active) or openmotion_media_use (action="inspect" passing modality for each planned asset type — e.g. "image" for visuals/textures/3-view sheets and "audio" for BGM/SFX/voice — then models with refresh:true and reference, including checking live "3d" capability on 3D briefs). Prefer usable signed-in OpenDesign models (mediaEntitlement "included" or signed-in "unknown", not "not-included") or configured BYOK providers. When planned image, audio, or video generation has no fitting usable provider for that modality (even if the user did not explicitly ask for AI assets): if the user is signed out with no usable API key (agent_media_signed_out), you MUST call openmotion_open_preview with the modality-scoped settingsHandoff from openmotion_media_use(action="inspect", modality=...) to open/return the OpenDesign sign-in page and guide the user to sign in (or configure an API key); if the user is signed in without a multimodal subscription (Free/Go mediaEntitlement "not-included", entry agent_media_upgrade_free / agent_media_upgrade_go), you MUST call openmotion_open_preview with that settingsHandoff (and present upgrade.url if returned) and explicitly inform the user that multimodal generation requires subscribing to OpenDesign Plus (or saving an API key); if a saved API key was rejected (agent_media_key_rejected), call openmotion_open_preview with settingsHandoff and ask them to replace the key. Pause in one turn with two clear choices: (1) sign in / subscribe to OpenDesign Plus (or save an API key) and reply to continue with AI multimodal assets, or (2) build a playable code-placeholder prototype first (procedural visuals plus WebAudio SFX/BGM). Fall back to procedural/CC0 art and WebAudio BGM/SFX only if the user chooses option (2), declines generation, or explicitly requested pure-code output (or for the 3D mesh step alone when no live 3D model is yet available on the platform, while still running image/audio discovery and onboarding normally). Do not pre-block Plus+ accounts on cached hasBalance; if a real generation request fails with insufficient balance / balance is too low, stop without retrying, call openmotion_open_preview(target="providers", entry="agent_media_balance_low"), and ask the user to top up and reply to resume. When usable models are ready, obtain one batched spend-consent check when required (skip if already granted or managed by Studio/host generation consent settings; stop after PLAN + that consent question if waiting), submit concurrently via openmotion_capability_run or openmotion_assets_use(action="generate") for planned focal visuals, textures/3-view sheets, 3D assets, and looping BGM/SFX, author game logic/UI while jobs run, inspect via batch read, and embed literal /motion-api/assets/<assetId>/versions/<versionId>/media URLs (or import local .glb models into the asset library).';

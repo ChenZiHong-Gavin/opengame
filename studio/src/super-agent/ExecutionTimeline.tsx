@@ -2657,12 +2657,16 @@ function GateActionCard({
       );
     }
     if (isTopUp) {
+      const clickedId = entryId;
       openBalanceGate({
         reason: 'insufficient_balance',
         pageName: 'creative_studio',
         studioId: 'game',
+        entryId: clickedId,
+        hookId: hookId ?? 'failure_card_topup',
         ...(onResume ? { onRecovered: () => onResume(card, { key: handoffKey ?? card.id }) } : {}),
       });
+      setEntryId(newCampaignEntryId());
       return;
     }
     onTrigger?.(card);

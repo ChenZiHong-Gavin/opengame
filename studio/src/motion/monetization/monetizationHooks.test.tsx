@@ -99,10 +99,51 @@ describe('OpenGame monetization attribution & gate hooks', () => {
       ['ui_click', { page_name: 'creative_studio', area: 'entitlement_modal', element: 'open_pricing', hook_id: 'balance_gate_topup', entry_id: id, studio_id: 'game' }],
       ['ui_click', { page_name: 'creative_studio', area: 'entitlement_modal', element: 'check_balance', hook_id: 'concurrency_gate_upgrade', entry_id: id, studio_id: 'game' }],
       ['surface_view', { page_name: 'creative_studio', area: 'entitlement_gate', element: 'gate_card', hook_id: 'game_publish_panel_signin', publish_target: 'game', studio_id: 'game' }],
+      ['surface_view', { page_name: 'creative_studio', area: 'entitlement_gate', element: 'gate_card', hook_id: 'game_publish_failed_signin', publish_target: 'game', studio_id: 'game' }],
+      ['surface_view', { page_name: 'creative_studio', area: 'entitlement_gate', element: 'gate_card', hook_id: 'game_publish_post_signin', publish_target: 'game', studio_id: 'game' }],
+      ['surface_view', { page_name: 'creative_studio', area: 'entitlement_gate', element: 'gate_card', hook_id: 'game_publish_telegram_signin', publish_target: 'game', studio_id: 'game' }],
+      ['surface_view', { page_name: 'model_hub', area: 'hub_header', element: 'banner', hook_id: 'model_hub_bf_pill', campaign_id: 'black_friday_2026', entry_id: id, hub_id: 'seedance-2-5', signed_in: false }],
+      ['surface_view', { page_name: 'explore', area: 'campaign_banner', element: 'banner', hook_id: 'explore_bf_hero', campaign_id: 'black_friday_2026', entry_id: id }],
+      ['surface_view', { page_name: 'settings', area: 'provider_detail', element: 'gate_card', hook_id: 'balance_gate_topup', signed_in: true }],
       ['ui_click', { page_name: 'creative_studio', area: 'entitlement_gate', element: 'open_pricing', hook_id: 'game_publish_unlisted_upgrade', entry_id: id, publish_target: 'game', studio_id: 'game' }],
+      ['ui_click', { page_name: 'explore', area: 'header', element: 'open_account' }],
+      ['ui_click', { page_name: 'explore', area: 'header', element: 'open_subscription' }],
+      ['ui_click', { page_name: 'explore', area: 'header', element: 'open_browser_signin', hook_id: 'header_signin' }],
+      ['ui_click', { page_name: 'settings', area: 'provider_detail', element: 'get_api_key', provider_kind: 'builtin', provider_id: 'fal' }],
+      ['ui_click', { page_name: 'creative_studio', area: 'web_publish', element: 'open_account_settings', publish_target: 'game', hook_id: 'game_publish_signin' }],
+      ['ui_click', { page_name: 'studio', area: 'asset_create', element: 'connect_provider' }],
     ] as const) {
       expect(validProperties(studioEvents, event, props)).toBe(true);
     }
+  });
+
+  it('preserves caller entryId and hookId through MonetizationGateModal without re-minting', async () => {
+    const callerEntryId = '11111111-2222-4333-8444-555555555555';
+    await act(async () => {
+      root.render(<I18nProvider initialLocale="en"><MonetizationGateModal /></I18nProvider>);
+    });
+    await act(async () => {
+      openBalanceGate({ reason: 'insufficient_balance', entryId: callerEntryId, hookId: 'failure_card_topup' });
+    });
+
+    const impression = tracked().find(item => item.event === 'surface_view');
+    expect(impression?.properties).toMatchObject({
+      hook_id: 'failure_card_topup',
+      entry_id: callerEntryId,
+    });
+
+    const cta = document.querySelector<HTMLAnchorElement>('[data-testid="monetization-gate-cta"]')!;
+    cta.addEventListener('click', event => event.preventDefault());
+    expect(new URL(cta.href).searchParams.get('od_entry_id')).toBe(attributedEntryId(callerEntryId));
+
+    await act(async () => {
+      cta.click();
+    });
+    const click = tracked().find(item => item.event === 'ui_click' && item.properties.element === 'open_pricing');
+    expect(click?.properties).toMatchObject({
+      hook_id: 'failure_card_topup',
+      entry_id: callerEntryId,
+    });
   });
 
   it('renders BalanceGateDialog, tracks impression & CTA click, and deduplicates focus+visibilitychange refresh', async () => {
@@ -248,6 +289,34 @@ describe('OpenGame monetization attribution & gate hooks', () => {
     expect(onRecovered).toHaveBeenCalledTimes(2);
     expect(document.querySelector('[data-testid="monetization-gate-resume-error"]')).toBeNull();
     expect(document.querySelector('[data-testid="monetization-gate-recovered"]')).not.toBeNull();
+  });
+
+  it('suppresses motion:account-changed when shared post-checkout entitlement refresh fails', async () => {
+    const { gatewayRequest } = await import('../gatewayClient');
+    const { refreshEntitlementAfterCheckout } = await import('../entitlementAttribution');
+    const mockGateway = vi.mocked(gatewayRequest);
+    mockGateway.mockResolvedValueOnce({ state: 'signed-in', plan: 'free', billingUnavailable: true });
+
+    const accountChanged = vi.fn();
+    window.addEventListener('motion:account-changed', accountChanged);
+    try {
+      await refreshEntitlementAfterCheckout('creative_studio', 'studio_free_gate', '7d1c6f4e-6a1f-4c55-9a43-0c7a4a0a8f11', Promise.resolve('free'));
+      expect(accountChanged).not.toHaveBeenCalled();
+      expect(tracked().filter(item => item.event === 'entitlement_refresh_result')).toEqual([
+        {
+          event: 'entitlement_refresh_result',
+          properties: {
+            page_name: 'creative_studio',
+            hook_id: 'studio_free_gate',
+            entry_id: '7d1c6f4e-6a1f-4c55-9a43-0c7a4a0a8f11',
+            outcome: 'failure',
+            plan_changed: false,
+          },
+        },
+      ]);
+    } finally {
+      window.removeEventListener('motion:account-changed', accountChanged);
+    }
   });
 
   it('propagates caller studioId, modality, and entryId across modal view, click, refresh, and pricing URL', async () => {

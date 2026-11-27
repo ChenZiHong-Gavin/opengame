@@ -110,7 +110,7 @@ export function MonetizationGateModal() {
     recoveredNotifiedRef.current = false;
     pollAttemptsRef.current = 0;
 
-    const hookId = gateHookId(gate.kind);
+    const hookId = gate.hookId ?? gateHookId(gate.kind);
     reportEntitlementModalView(gate.pageName ?? 'creative_studio', hookId, {
       ...(gate.studioId ? { studio_id: gate.studioId } : {}),
       ...(gate.modality ? { modality: gate.modality } : {}),
@@ -170,7 +170,7 @@ export function MonetizationGateModal() {
     const current = activeGateRef.current;
     if (!current || checkInFlightRef.current) return;
     checkInFlightRef.current = true;
-    const hookId = gateHookId(current.kind);
+    const hookId = current.hookId ?? gateHookId(current.kind);
     const pageName = current.pageName ?? 'creative_studio';
     if (!fromPoll) setChecking(true);
     try {
@@ -241,7 +241,7 @@ export function MonetizationGateModal() {
 
   const isBalance = gate.kind === 'balance';
   const isResolution = gate.kind === 'resolution';
-  const hookId = gateHookId(gate.kind);
+  const hookId = gate.hookId ?? gateHookId(gate.kind);
   const source = gateEntrySource(gate.kind);
   const pageName = gate.pageName ?? 'creative_studio';
   const pricingHref = campaignPricingUrl(locale, source, entryId, {

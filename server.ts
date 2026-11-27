@@ -61,7 +61,7 @@ import { Phase1Service } from './phase1.ts';
 import { phase1McpCapabilities } from './shared/phase1-tools.ts';
 import { recoverProjectTransactions } from './phase1-versions.ts';
 import { classifyRenderFailure } from './shared/render-failure.ts';
-import { connectorCauseCodes } from './tracking/tool-fields.ts';
+import { exportSystemErrorCodes } from './tracking/tool-fields.ts';
 import { verifyExport } from './scripts/verify-export.ts';
 import { createAppTracking, closeTracking, saveTrackingPreference, trackingPreference, trackingLockReason, type OmTracking } from './shared/tracking.ts';
 import { flushCodexSessionTracking, syncActiveCodexThreads } from './shared/codex-session-tracking.ts';
@@ -89,24 +89,14 @@ export type Service = { trackingHosts?: Map<string, { host: HostContext; created
 const service: Service = {};
 const working = new Set<string>();
 const runningExports = new Map<string, AbortController>();
-const workerInstanceId = crypto.randomUUID();
-const collectorId = crypto.randomUUID();
-let lastQueueTelemetry = 0;
 let lastCodexSessionSync = 0;
 
-async function emitQueueTelemetry(store: WorkspaceStore, tracking?: OmTracking) {
-  if (Date.now() - lastCodexSessionSync >= 60_000) {
-    lastCodexSessionSync = Date.now();
-    void syncActiveCodexThreads(store.directory).catch(() => {});
-    void syncActiveHostSessions(store.directory).catch(() => {});
-  }
-  if (!tracking) return;
-  if (Date.now() - lastQueueTelemetry < 60_000) return;
-  lastQueueTelemetry = Date.now();
-  const job = await store.job().catch(() => null);
-  const queued = job?.state === 'pending' ? 1 : 0, running = job && ['running', 'cancelling'].includes(job.state) ? 1 : 0;
-  tracking.track('queue_snapshot', { instance_id: workerInstanceId, task_type: 'export', queued_count: queued, running_count: running, available_slots: running ? 0 : 1, counts_complete: true }, undefined, 'worker');
-  tracking.track('worker_heartbeat', { collector_id: collectorId, instance_id: workerInstanceId, active: true, queue_count: queued + running }, undefined, 'worker');
+// Periodic queue_snapshot and worker_heartbeat telemetry was retired; keep the 60s Codex and host session sync only.
+function syncCodexSessionsIfDue(store: WorkspaceStore) {
+  if (Date.now() - lastCodexSessionSync < 60_000) return;
+  lastCodexSessionSync = Date.now();
+  void syncActiveCodexThreads(store.directory).catch(() => {});
+  void syncActiveHostSessions(store.directory).catch(() => {});
 }
 
 export async function cancelExport(store: WorkspaceStore, projectId: string, jobId: string, tracking = store.tracking) {
@@ -160,7 +150,7 @@ export async function trackExportTerminal(store: WorkspaceStore, final: ExportJo
 }
 
 export async function renderNext(store: WorkspaceStore, runtimeRoot: string, tracking?: OmTracking) {
-  await emitQueueTelemetry(store, tracking);
+  syncCodexSessionsIfDue(store);
   const pending = await store.job();
   const key = store.directory;
   // The tick that renders a job also owns its record, so no tick reconciles work still running in this process.
@@ -246,7 +236,7 @@ export async function renderNext(store: WorkspaceStore, runtimeRoot: string, tra
   } catch (error) {
     if (!job) throw error;
     const code = (error as NodeJS.ErrnoException | undefined)?.code;
-    if (code && connectorCauseCodes.includes(code)) failure.systemError = code;
+    if (code && exportSystemErrorCodes.includes(code)) failure.systemError = code;
     if (failure.failureStage === 'render' && code === 'COMMAND_TIMEOUT') failure.failureCode = 'EXPORT_RENDER_TIMEOUT';
     if (failure.failureStage === 'output' && code === 'ENOENT') failure.failureCode = 'EXPORT_OUTPUT_MISSING';
     await recordDiagnostic(store.directory, { kind: 'export_failed', jobId: job.id, projectId: job.projectId,

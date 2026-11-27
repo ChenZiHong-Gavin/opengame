@@ -67,7 +67,7 @@ function LinkFailedCard({ entry, onNotify }: {
 }) {
   const { t } = useI18n();
   const session = useGamePublishSession(entry.artifactId);
-  const { authorizing, signingIn, startSignIn } = useOpenDesignPublishSignIn(entry.artifactId, onNotify);
+  const { authorizing, signingIn, startSignIn } = useOpenDesignPublishSignIn(entry.artifactId, onNotify, 'game_publish_failed_signin', Boolean(entry.authRequired));
   const canSkip = Boolean(session?.platformId && session.platformId !== 'telegram');
   return (
     <div className="om-gp-result-card" data-failed>
@@ -157,7 +157,7 @@ function ThreadEntry({ entry, activeInline, onOpenPanel, onNotify }: { entry: Ga
 function PostPublishSignInHook({ artifactId, onNotify }: { artifactId: string; onNotify?: Notify }) {
   const { t } = useI18n();
   const session = useGamePublishSession(artifactId);
-  const { account, signedIn, authorizing, signingIn, startSignIn } = useOpenDesignPublishSignIn(artifactId, onNotify);
+  const { account, signedIn, authorizing, signingIn, startSignIn } = useOpenDesignPublishSignIn(artifactId, onNotify, 'game_publish_post_signin', Boolean(session && !session.linkUrl));
   if (!session || session.linkUrl || !account || signedIn) return null;
   return (
     <div className="om-gp-post-signin" data-testid="game-publish-post-signin-hook">

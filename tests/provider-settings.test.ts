@@ -25,7 +25,7 @@ import { Phase1Service } from '../phase1.ts';
 import { pluginRoot } from '../hyperframes.ts';
 import type { Fetcher } from '../gateway/network.ts';
 import { providerRegistry, mediaProviders, registeredProvider } from '../shared/provider-registry.ts';
-import { attributedEntryId, PRODUCT_ID } from '../shared/product-identity.ts';
+import { attributedEntryId, currentProductId, PRODUCT_ID } from '../shared/product-identity.ts';
 import { providerAdapters } from '../gateway/providers.ts';
 import { transport } from './http.ts';
 import { callTool } from '../mcp.ts';
@@ -606,7 +606,8 @@ test('completed sign-in delivers its source through the shared sender and respec
   assert.equal(batch.length, 1); assert.equal(batch[0].event, 'account_sign_in_result');
   const fields = batch[0].properties;
   assert.equal(fields.outcome, 'success'); assert.equal(fields.product, 'openmotion');
-  assert.equal(fields.source_product, PRODUCT_ID); assert.equal(fields.source_detail, 'openmotion_editor_login');
+  const product = currentProductId();
+  assert.equal(fields.source_product, product); assert.equal(fields.source_detail, `${product}_editor_login`);
   assert.equal(fields.amr_user_id, 'fixture-user-id');
   assert.equal(fields.installation_id, installationId); assert.equal(fields.distinct_id, installationId); assert.equal(fields.utm_source, 'creator');
   assert.notEqual(fields.entry_id, fields.attempt_id);
@@ -644,7 +645,7 @@ test('finished sign-in reports the confirmed account only on success, without cr
   const [success, cancelled, failure] = records;
   const { attempt_id: _id, entry_id, entry_occurred_at, duration_ms, prepare_ms, link_ms, approved_ms, ...fixed } = success;
   assert.deepEqual(fixed, { diagnostics_version: 1, outcome: 'success', connector_version: '0.1.10', resumed: false, last_stage: 'credential_persist_result', last_result: 'success',
-    source_product: PRODUCT_ID, source_detail: 'openmotion_editor_login', amr_user_id: 'fixture-user-id',
+    source_product: currentProductId(), source_detail: `${currentProductId()}_editor_login`, amr_user_id: 'fixture-user-id',
     browser_opened: true, receipt: 'accepted', exit_code: 0 });
   assert.match(entry_id!, /^[0-9a-f-]{36}$/); assert.notEqual(entry_id, success.attempt_id);
   assert.equal(new Date(entry_occurred_at!).toISOString(), entry_occurred_at);
@@ -658,6 +659,68 @@ test('finished sign-in reports the confirmed account only on success, without cr
   assert.equal(new Set(records.map(record => record.attempt_id)).size, 3);
   for (const record of records) assert(validProperties(omEvents, 'account_sign_in_result', record), JSON.stringify(record));
   assert.doesNotMatch(JSON.stringify(records), /synthetic-private|TEST-123|open-design\.ai|fixture@example|Fixture user/);
+}));
+
+test('AMR authorization failure preserves the originating click ID and observed HTTP status', t => fixture(async store => {
+  const records: SignInRecord[] = [];
+  const account = new OpenDesignAccount(store.directory, { binary, track: record => records.push(record) });
+  t.after(() => account.close());
+  await chmod(binary, 0o755);
+  await mkdir(account.home, { recursive: true });
+  await writeFile(path.join(account.home, 'fixture-mode'), 'login-create-failure');
+  const entryId = randomUUID();
+  await account.login({ hookId: 'settings_signin', entryId });
+  await until(async () => records.length > 0);
+  assert.equal(records.length, 1);
+  const [failure] = records;
+  assert.equal(failure.outcome, 'failure');
+  assert.equal(failure.entry_id, entryId);
+  assert.equal(failure.hook_id, 'settings_signin');
+  assert.equal(failure.failed_stage, 'device_auth_create_result');
+  assert.equal(failure.http_status, 503);
+  assert(validProperties(omEvents, 'account_sign_in_result', failure));
+}));
+
+test('sign-in injects OpenGame attribution env vars into vela login and clears inherited attribution keys', t => fixture(async store => {
+  await chmod(binary, 0o755);
+  const { spawn } = await import('node:child_process');
+  const prevOrigin = process.env.OPEN_DESIGN_AMR_ORIGIN;
+  const prevCampaign = process.env.OPEN_DESIGN_AMR_CAMPAIGN_ID;
+  process.env.OPEN_DESIGN_AMR_ORIGIN = 'leaked_parent_origin';
+  process.env.OPEN_DESIGN_AMR_CAMPAIGN_ID = 'leaked_campaign';
+  t.after(() => {
+    if (prevOrigin === undefined) delete process.env.OPEN_DESIGN_AMR_ORIGIN; else process.env.OPEN_DESIGN_AMR_ORIGIN = prevOrigin;
+    if (prevCampaign === undefined) delete process.env.OPEN_DESIGN_AMR_CAMPAIGN_ID; else process.env.OPEN_DESIGN_AMR_CAMPAIGN_ID = prevCampaign;
+  });
+  let spawnedEnv: NodeJS.ProcessEnv | undefined;
+  const records: SignInRecord[] = [];
+  const entryId = randomUUID();
+  const account = new OpenDesignAccount(store.directory, {
+    binary,
+    track: record => records.push(record),
+    spawn: ((command, args, options) => {
+      spawnedEnv = options?.env;
+      return spawn(command, args, options);
+    }) as typeof spawn,
+  });
+  t.after(() => account.close());
+  await account.login({ hookId: 'header_signin', entryId });
+  await until(async () => Boolean((await account.summary()).authorizationUrl));
+  await writeFile(path.join(account.home, 'authorize'), 'yes');
+  await until(async () => (await account.summary()).state === 'signed-in');
+  const product = currentProductId();
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ORIGIN, product);
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ENTRY_ID, attributedEntryId(entryId));
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ENTRY_SOURCE, 'header_signin');
+  assert.match(String(spawnedEnv?.OPEN_DESIGN_AMR_ENTRY_AT), /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_PLACEMENT_ID, 'gui__studio__unknown__all');
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_CAMPAIGN_ID, undefined);
+  assert.equal(records.length, 1);
+  assert.equal(records[0].source_product, product);
+  assert.equal(records[0].source_detail, 'header_signin');
+  assert.equal(records[0].hook_id, 'header_signin');
+  assert.equal(records[0].entry_id, entryId);
+  assert(validProperties(omEvents, 'account_sign_in_result', records[0]), JSON.stringify(records[0]));
 }));
 
 test('sign-out keeps an undelivered revocation and retries it after a restart and on refresh', t => fixture(async store => {

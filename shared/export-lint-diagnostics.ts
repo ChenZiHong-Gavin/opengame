@@ -25,12 +25,12 @@ export function exportLintErrors(root: string, findings: HyperframeLintFinding[]
   for (const finding of findings) {
     if (finding?.severity !== 'error' || typeof finding.code !== 'string' || typeof finding.message !== 'string') continue;
     const file = typeof finding.file === 'string'
-      ? path.relative(root, path.resolve(root, finding.file))
+      ? path.relative(root, path.resolve(root, finding.file)).split(path.sep).join('/')
       : undefined;
     errors.push({
       code: finding.code,
       message: finding.message,
-      ...(file && !file.startsWith('../') && file !== '..' ? { file } : {}),
+      ...(file && !path.isAbsolute(file) && !file.startsWith('../') && file !== '..' ? { file } : {}),
       ...(Number.isInteger(finding.line) && { line: finding.line }),
       ...(Number.isInteger(finding.column) && { column: finding.column }),
       ...(typeof finding.fixHint === 'string' && { fixHint: finding.fixHint }),

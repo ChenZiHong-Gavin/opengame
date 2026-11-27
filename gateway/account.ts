@@ -422,7 +422,12 @@ export class OpenDesignAccount {
   private env() {
     // A different application's environment keys must not override this account session.
     const env: NodeJS.ProcessEnv = { ...process.env, AMR_HOME: this.home, OPEN_DESIGN_AMR_PROFILE: 'prod', VELA_PROFILE: 'prod' };
-    for (const key of ['VELA_RUNTIME_KEY', 'VELA_CONTROL_KEY', 'VELA_LINK_URL', 'VELA_API_URL', 'OD_AMR_ENDPOINT_BINDING', 'VELA_SOURCE_PRODUCT', 'VELA_OPENMOTION_JOB_ID']) delete env[key];
+    for (const key of [
+      'VELA_RUNTIME_KEY', 'VELA_CONTROL_KEY', 'VELA_LINK_URL', 'VELA_API_URL', 'OD_AMR_ENDPOINT_BINDING',
+      'VELA_SOURCE_PRODUCT', 'VELA_OPENMOTION_JOB_ID',
+      'OPEN_DESIGN_AMR_ORIGIN', 'OPEN_DESIGN_AMR_ENTRY_ID', 'OPEN_DESIGN_AMR_ENTRY_SOURCE',
+      'OPEN_DESIGN_AMR_ENTRY_AT', 'OPEN_DESIGN_AMR_PLACEMENT_ID', 'OPEN_DESIGN_AMR_CAMPAIGN_ID', 'OPEN_DESIGN_AMR_DEVICE_ID',
+    ]) delete env[key];
     return env;
   }
   private async credentials() {
@@ -455,8 +460,9 @@ export class OpenDesignAccount {
       ?? attempt.stages.findLast(entry => entry.startsWith('browser_open_result:failed')))?.split(':');
     const [failedStage, , errorKind] = failedEntry ?? [];
     const browser = attempt.stages.find(entry => entry.startsWith('browser_open_result:'))?.split(':')[1];
+    const product = currentProductId();
     const record = { attempt_id: attempt.id, outcome, error_code: errorCode, diagnostics_version: 1, cancel_source: cancelSource, failed_stage: failedStage, connector_cause: connector?.causeCode, http_status: attempt.httpStatus, network_reason: attempt.networkReason, connector_problem: connector?.problem, connector_version: connectorVersion, resumed: Boolean(attempt.resumed),
-      source_product: currentProductId(), source_detail: 'openmotion_editor_login',
+      source_product: product, source_detail: this.clock.hookId ?? `${product}_editor_login`,
       ...(this.clock.hookId ? { hook_id: this.clock.hookId } : {}),
       entry_id: this.clock.entryId, entry_occurred_at: this.clock.occurredAt,
       ...(this.clock.entryFrom ? { entry_from: this.clock.entryFrom } : {}),
@@ -831,7 +837,17 @@ export class OpenDesignAccount {
     if (resumed) attempt.resumed = true;
     const clock = this.clock!;
     clock.link = clock.approved = undefined;
-    const env = { ...this.env(), OPEN_DESIGN_AMR_AUTH_STAGE_FORMAT: 'jsonl-v1', OPEN_DESIGN_AMR_AUTH_ATTEMPT_ID: attempt.id };
+    const product = currentProductId();
+    const env = {
+      ...this.env(),
+      OPEN_DESIGN_AMR_AUTH_STAGE_FORMAT: 'jsonl-v1',
+      OPEN_DESIGN_AMR_AUTH_ATTEMPT_ID: attempt.id,
+      OPEN_DESIGN_AMR_ORIGIN: product,
+      OPEN_DESIGN_AMR_ENTRY_ID: attributedEntryId(clock.entryId),
+      OPEN_DESIGN_AMR_ENTRY_SOURCE: clock.hookId ?? `${product}_editor_login`,
+      OPEN_DESIGN_AMR_ENTRY_AT: clock.occurredAt,
+      OPEN_DESIGN_AMR_PLACEMENT_ID: buildPlacementId('gui', 'studio', clock.studioId ?? 'unknown', clock.modality ?? 'all'),
+    };
     const child = (this.options.spawn ?? spawn)(binary, ['login', '--completion-receipt=stdin-v1'], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     this.child = child;
     let output = '', partial = '', protocol = false, cancelled = false;

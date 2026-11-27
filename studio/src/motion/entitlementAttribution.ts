@@ -91,6 +91,41 @@ export function evaluateEntitlementRefresh(
   return { billingOk, planChanged };
 }
 
+export function captureCurrentPlan(): Promise<string | undefined> {
+  return gatewayRequest<AccountSummary>('settings/account')
+    .then(summary => readAccountPlan(summary))
+    .catch(() => undefined);
+}
+
+/** Shared post-checkout account refresh and attribution reporting. */
+export function refreshEntitlementAfterCheckout(
+  trackingPage: NonNullable<Fields<'entitlement_refresh_result'>['page_name']>,
+  hookId: EntitlementHookId,
+  entryId: string,
+  prevPlanPromise: Promise<string | undefined> = Promise.resolve(undefined),
+  onError?: (message: string) => void,
+  context?: AttributionContext,
+): Promise<void> {
+  const extra = {
+    ...(context?.studioId ? { studio_id: context.studioId } : {}),
+    ...(context?.modality ? { modality: context.modality } : {}),
+    ...(context?.entryFrom ? { entry_from: context.entryFrom } : {}),
+  };
+  return Promise.all([prevPlanPromise, gatewayRequest<AccountSummary>('settings/account?refresh=true')])
+    .then(([prevPlan, updated]) => {
+      const { billingOk, planChanged } = evaluateEntitlementRefresh(prevPlan, updated);
+      reportEntitlementRefresh(trackingPage, hookId, entryId, billingOk ? 'success' : 'failure', planChanged, extra);
+      if (billingOk) {
+        notifyProvidersChanged();
+        window.dispatchEvent(new Event('motion:account-changed'));
+      }
+    })
+    .catch((error: unknown) => {
+      reportEntitlementRefresh(trackingPage, hookId, entryId, 'failure', false, extra);
+      if (onError) onError(error instanceof Error ? error.message : String(error));
+    });
+}
+
 /** Shared checkout-return listener for PricingEntry, BlackFridayTopBanner, and Studio gates. */
 export function useCheckoutReturnRefresh(
   trackingPage: NonNullable<Fields<'entitlement_refresh_result'>['page_name']>,
@@ -103,27 +138,16 @@ export function useCheckoutReturnRefresh(
   const entryFrom = context?.entryFrom;
 
   useEffect(() => {
-    const extra = {
-      ...(studioId ? { studio_id: studioId } : {}),
+    const refreshContext: AttributionContext = {
+      ...(studioId ? { studioId } : {}),
       ...(modality ? { modality } : {}),
-      ...(entryFrom ? { entry_from: entryFrom } : {}),
+      ...(entryFrom ? { entryFrom } : {}),
     };
     const onReturn = () => {
       const pending = pendingRef.current;
       if (!pending || document.visibilityState !== 'visible') return;
       pendingRef.current = undefined;
-      void Promise.all([pending.prevPlanPromise, gatewayRequest<AccountSummary>('settings/account?refresh=true')])
-        .then(([prevPlan, updated]) => {
-          const { billingOk, planChanged } = evaluateEntitlementRefresh(prevPlan, updated);
-          reportEntitlementRefresh(trackingPage, hookId, pending.entryId, billingOk ? 'success' : 'failure', planChanged, extra);
-          if (billingOk) {
-            notifyProvidersChanged();
-            window.dispatchEvent(new Event('motion:account-changed'));
-          }
-        })
-        .catch(() => {
-          reportEntitlementRefresh(trackingPage, hookId, pending.entryId, 'failure', false, extra);
-        });
+      void refreshEntitlementAfterCheckout(trackingPage, hookId, pending.entryId, pending.prevPlanPromise, undefined, refreshContext);
     };
     window.addEventListener('focus', onReturn);
     document.addEventListener('visibilitychange', onReturn);
@@ -134,9 +158,6 @@ export function useCheckoutReturnRefresh(
   }, [trackingPage, hookId, studioId, modality, entryFrom]);
 
   return useCallback((entryId: string) => {
-    const prevPlanPromise = gatewayRequest<AccountSummary>('settings/account')
-      .then(summary => readAccountPlan(summary))
-      .catch(() => undefined);
-    pendingRef.current = { entryId, prevPlanPromise };
+    pendingRef.current = { entryId, prevPlanPromise: captureCurrentPlan() };
   }, []);
 }

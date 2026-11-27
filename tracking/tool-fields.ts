@@ -561,6 +561,7 @@ export function assetImportError(error: unknown) {
 }
 
 export const connectorCauseCodes: readonly string[] = ['ENOENT', 'MODULE_NOT_FOUND', 'EACCES', 'EPERM', 'ENOEXEC', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'ENOSPC', 'EINTEGRITY', 'VERSION_MISMATCH'];
+export const exportSystemErrorCodes: readonly string[] = ['ENOENT', 'EACCES', 'EPERM', 'ENOEXEC', 'ETIMEDOUT', 'ENOSPC', 'ENOMEM', 'EBUSY', 'EMFILE', 'EIO'];
 export const renderFailureReasons = ['browser_start', 'local_port_denied', 'encoder', 'process_signalled', 'unclassified'] as const;
 export const verifyFailureReasons = ['timeout', 'tool_unavailable', 'process_error', 'decoder_error', 'no_frames', 'expectation_mismatch', 'missing_audio', 'unexpected_audio', 'audio_codec', 'io_error'] as const;
 export type VerifyFailureReason = typeof verifyFailureReasons[number];

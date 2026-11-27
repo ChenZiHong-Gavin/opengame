@@ -58,8 +58,9 @@ test('Motion lint retains cancellation before starting its isolated worker', () 
 test('post-render diagnostics inspect the selected entry under the renderer CLI policy', () => fixture(async store => {
   const directory = store.projectDirectory;
   const source = await readFile(path.join(directory, 'index.html'), 'utf8');
-  const { writeFile } = await import('node:fs/promises');
-  await writeFile(path.join(directory, 'scene.html'), source.replace(/data-width="[0-9]+"/, ''));
-  const findings = await diagnoseFailedRender(pluginRoot, directory, 'scene.html');
-  assert.ok(findings.some(item => item.code === 'root_missing_dimensions' && item.file === 'scene.html'));
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  await mkdir(path.join(directory, 'scenes'));
+  await writeFile(path.join(directory, 'scenes', 'scene.html'), source.replace(/data-width="[0-9]+"/, ''));
+  const findings = await diagnoseFailedRender(pluginRoot, directory, 'scenes/scene.html');
+  assert.ok(findings.some(item => item.code === 'root_missing_dimensions' && item.file === 'scenes/scene.html'));
 }));

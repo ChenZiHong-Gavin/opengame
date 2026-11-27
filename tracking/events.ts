@@ -1,5 +1,5 @@
 import {
-  assetImportErrorCodes, connectorCauseCodes, renderFailureReasons, verifyFailureReasons,
+  assetImportErrorCodes, connectorCauseCodes, exportSystemErrorCodes, renderFailureReasons, verifyFailureReasons,
   exportFailureCodes,
   exportFailureStages,
   mediaGenerationAccountPlans,
@@ -145,9 +145,11 @@ export const entitlementHookIds = [
   'studio_generate', 'cloud_export', 'session_expired_401', 'header_pricing', 'bf_banner',
   'settings_subscription', 'studio_free_gate', 'model_picker_upgrade', 'studio_res_gate',
   'failure_card_topup', 'mcp_oauth',
-  'model_hub_signin', 'model_hub_upgrade', 'game_publish_signin', 'cloud_share_signin',
+  'model_hub_signin', 'model_hub_upgrade', 'model_hub_bf_pill', 'explore_bf_hero',
+  'game_publish_signin', 'cloud_share_signin',
   'balance_gate_topup', 'concurrency_gate_upgrade',
   'game_publish_panel_signin', 'game_publish_unlisted_upgrade',
+  'game_publish_failed_signin', 'game_publish_post_signin', 'game_publish_telegram_signin',
 ] as const;
 export type EntitlementHookId = (typeof entitlementHookIds)[number];
 const campaign = { campaign_id: ['black_friday_2026'], entry_id: 'uuid', hook_id: entitlementHookIds } as const;
@@ -266,12 +268,12 @@ export const omEvents = {
     previous_error_code: mediaGenerationErrorCodes,
     previous_failure_phase: mediaGenerationFailurePhases,
   }, required: ['modality', 'job_id', 'job_state', 'asset_count'] },
-  export_result: { producers: ['worker'], fields: { job_id: 'uuid', job_state: ['completed', 'failed', 'cancelled'], duration_ms: 'integer', technical_check: ['passed', 'failed', 'unknown'], diagnostics_version: 'integer', check_code: 'code', rule_count: 'integer', verification_reason: verifyFailureReasons, system_error: connectorCauseCodes, terminal_signal: ['SIGKILL', 'SIGTERM', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'other'], render_reason: renderFailureReasons, renderer_exit_code: 'integer', stage_duration_ms: 'integer', queue_duration_ms: 'integer', failure_stage: exportFailureStages, error_code: exportFailureCodes }, required: ['job_id', 'job_state', 'duration_ms', 'technical_check'] },
+  export_result: { producers: ['worker'], fields: { job_id: 'uuid', job_state: ['completed', 'failed', 'cancelled'], duration_ms: 'integer', technical_check: ['passed', 'failed', 'unknown'], diagnostics_version: 'integer', check_code: 'code', rule_count: 'integer', verification_reason: verifyFailureReasons, system_error: exportSystemErrorCodes, terminal_signal: ['SIGKILL', 'SIGTERM', 'SIGINT', 'SIGABRT', 'SIGSEGV', 'other'], render_reason: renderFailureReasons, renderer_exit_code: 'integer', stage_duration_ms: 'integer', queue_duration_ms: 'integer', failure_stage: exportFailureStages, error_code: exportFailureCodes }, required: ['job_id', 'job_state', 'duration_ms', 'technical_check'] },
   // One per finished OpenDesign sign-in attempt. `replaced` is an interrupted attempt the service refused; the same
   // sign-in continues with a new attempt. Times are milliseconds since the click. Stage values come from the connector
   // protocol; only confirmed account IDs are allowed, never links, authorization codes or credentials.
   account_sign_in_result: { producers: ['mcp'], fields: { attempt_id: 'uuid', outcome: ['success', 'failure', 'cancelled', 'replaced'],
-    source_product: ['openmotion', 'opengame'], source_detail: ['openmotion_editor_login'], hook_id: entitlementHookIds, entry_id: 'uuid', entry_occurred_at: 'timestamp',
+    source_product: ['openmotion', 'opengame'], source_detail: ['openmotion_editor_login', 'opengame_editor_login', ...entitlementHookIds], hook_id: entitlementHookIds, entry_id: 'uuid', entry_occurred_at: 'timestamp',
     entry_from: providerSetupEntries, studio_id: 'slug', modality: attributionModality, amr_user_id: 'code',
     error_code: ['connector_unavailable', 'setup_failed', 'interrupted', 'authorization_expired', 'credentials_rejected'],
     diagnostics_version: 'integer', cancel_source: ['app', 'browser'], failed_stage: accountStages, network_reason: ['dns', 'connection_refused', 'connection_reset', 'timeout'], connector_cause: connectorCauseCodes, http_status: { min: 100, max: 599, integer: true }, connector_problem: ['npm_missing', 'install_timeout', 'install_failed', 'start_failed'], connector_version: 'code', resumed: 'boolean',
@@ -394,7 +396,8 @@ export const omEvents = {
       'create_trailer', 'regenerate_trailer', 'open_trailer_project', 'open_game_studio', 'view_all_games',
       'open_palette', 'select_result', 'scope_tab', 'popular_topic', 'ask_super_agent',
       'open_skill_fallback', 'toggle_options', 'toggle_instruction', 'run_super_agent',
-      'close_modal', 'check_balance'],
+      'close_modal', 'check_balance',
+      'open_account', 'open_subscription', 'open_browser_signin', 'get_api_key', 'open_account_settings', 'connect_provider'],
     // The chosen value of a control with a small fixed set of choices; never free text.
     option: ['on', 'off', 'light', 'dark', 'en', 'zh-CN', 'ja', 'ko', 'de', 'fr', 'ru', 'es', 'pt-BR', 'it', 'tr',
       'all', 'images', 'video', 'audio', 'fonts',
@@ -438,10 +441,10 @@ export const omEvents = {
     required: ['outcome', 'entry_point', 'requested_count', 'added_count', 'failed_count'] },
   // A surface that became visible: the library, a template card, one template's detail, or the instruction to copy.
   // A card counts once it is at least half visible for a second, once per result set.
-  surface_view: { producers: ['studio'], fields: { page_name: pages, area: ['template_library', 'template_card', 'template_detail', 'template_instruction', 'template_discovery', 'template_related', 'template_guide', 'skill_detail', 'brand_detail', 'template_series_card', 'template_series_detail', 'template_series_work', 'campaign_banner', 'command_palette', 'template_zero_result_skills', 'asset_create', 'account', 'entitlement_modal', 'entitlement_gate', 'game_detail', 'game_handoff'],
+  surface_view: { producers: ['studio'], fields: { page_name: pages, area: ['template_library', 'template_card', 'template_detail', 'template_instruction', 'template_discovery', 'template_related', 'template_guide', 'skill_detail', 'brand_detail', 'template_series_card', 'template_series_detail', 'template_series_work', 'campaign_banner', 'command_palette', 'template_zero_result_skills', 'asset_create', 'account', 'entitlement_modal', 'entitlement_gate', 'game_detail', 'game_handoff', 'hub_header', 'provider_detail'],
     element: ['library', 'card', 'detail', 'instruction', 'search_recovery', 'reference', 'related', 'guide', 'banner', 'palette', 'skill_fallback', 'modal', 'gate_card', 'handoff'], ...generationOffer, settings_section: settingsSection, scene_id: creative.scene_id, ...campaign, placement, position: 'integer', source_template_id: 'slug', ...templateList, ...templateDetail, ...template, ...templateSeries,
     ...skill, ...brand, ...referenceEntry, brand_state: brandState, recovery_reason: ['no_results', 'unsuitable', 'catalog_empty'],
-    studio_id: creative.studio_id, modality: attributionModality, ...game, publish_target: webPublishTargets },
+    studio_id: creative.studio_id, modality: attributionModality, ...game, publish_target: webPublishTargets, hub_id: modelHub.hub_id, signed_in: modelHub.signed_in },
     required: ['page_name', 'area', 'element'] },
   // Global Cmd+K command palette settled search; one per settled query, never per keystroke.
   command_palette_search_result: { producers: ['studio'], fields: { page_name: pages, area: ['command_palette'],

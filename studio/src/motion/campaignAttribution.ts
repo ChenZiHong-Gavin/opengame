@@ -113,7 +113,9 @@ export type CampaignEntrySource =
   | 'opengame_resolution_gate'
   | 'opengame_studio_free_gate'
   | 'opengame_agent_upgrade'
-  | 'opengame_publish_unlisted';
+  | 'opengame_publish_unlisted'
+  | 'opengame_model_hub_bf_pill'
+  | 'opengame_explore_bf_hero';
 /** Canonical semantic touchpoint (`EntitlementHookId`) for each Pricing link source. */
 const entrySourceHookId: Record<CampaignEntrySource, EntitlementHookId> = {
   openmotion_bf_banner: 'bf_banner',
@@ -124,6 +126,8 @@ const entrySourceHookId: Record<CampaignEntrySource, EntitlementHookId> = {
   opengame_studio_free_gate: 'studio_free_gate',
   opengame_agent_upgrade: 'studio_free_gate',
   opengame_publish_unlisted: 'game_publish_unlisted_upgrade',
+  opengame_model_hub_bf_pill: 'model_hub_bf_pill',
+  opengame_explore_bf_hero: 'explore_bf_hero',
 };
 
 const defaultStudioForSource: Record<CampaignEntrySource, string> = {
@@ -135,6 +139,8 @@ const defaultStudioForSource: Record<CampaignEntrySource, string> = {
   opengame_studio_free_gate: 'assets',
   opengame_agent_upgrade: 'game',
   opengame_publish_unlisted: 'game',
+  opengame_model_hub_bf_pill: 'model_hub',
+  opengame_explore_bf_hero: 'explore',
 };
 
 export type CampaignPricingContext = {

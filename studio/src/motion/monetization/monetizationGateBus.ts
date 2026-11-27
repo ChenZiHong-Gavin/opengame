@@ -3,6 +3,7 @@
  * Deliberately decoupled from multi-tenant WorkspaceCollabContext so it works cleanly in OpenGame Studio.
  */
 import { useSyncExternalStore } from 'react';
+import type { EntitlementHookId } from '../../../../tracking/events.ts';
 import type { Fields } from '../reporting';
 
 export type MonetizationGateKind = 'balance' | 'concurrency' | 'resolution';
@@ -12,8 +13,9 @@ export interface MonetizationGateRequest {
   pageName?: NonNullable<Fields<'surface_view'>['page_name']>;
   studioId?: string;
   modality?: 'image' | 'video' | 'audio' | 'all';
-  /** Optional entry_id to correlate an initiating touchpoint click with this modal impression and checkout link. */
+  /** Optional attribution carried from the triggering card/touchpoint so entry_id and hook_id stay unbroken. */
   entryId?: string;
+  hookId?: EntitlementHookId;
   /** Optional contextual detail from a failed generation or publish call (never raw stack traces). */
   reason?: 'insufficient_balance' | 'quota_exceeded' | 'billing_past_due' | 'concurrency_limit' | 'high_resolution';
   activeCount?: number;

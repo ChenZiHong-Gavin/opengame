@@ -32,9 +32,9 @@ import { isOpenDesignProvider, modelFamilyLabel, providerDisplayName } from './i
 import { registeredProvider } from '../../../shared/provider-registry';
 import { createOfferVisit } from './offerTracking';
 import { ProviderSetupNotice, GenerationSignInNotice, GenerationUpgradeNotice } from './ProviderSetupNotice';
-import { BLACK_FRIDAY_CAMPAIGN, campaignPricingUrl, newCampaignEntryId, pricingLinkTargetProps, useBlackFridayActive } from './campaignAttribution';
-import { setPendingAttribution, useCheckoutReturnRefresh } from './entitlementAttribution';
+import { setPendingAttribution } from './entitlementAttribution';
 import { detectMonetizationGateFromError, openMonetizationGate, openResolutionGate } from './monetization/monetizationGateBus';
+import { StudioFreeGateCard } from './monetization/StudioFreeGateCard';
 import { send } from './reporting';
 
 export interface AssetGuideExample { title: string; prompt: string; poster: string; clip?: string; posterAspect?: number }
@@ -49,16 +49,10 @@ export function AssetComposer({ active, studio, draft, setDraft, agentReferences
   onUploadFiles?: (files: File[], source?: 'drop' | 'paste') => void; uploadingReferences?: boolean;
   onCreated: (job: GenerationJob) => void; onResume?: (job: GenerationJob) => Promise<void>; onError: (message: string) => void; onInfo?: (message: string) => void; onClose: () => void;
 }) {
-  const { locale, t } = useI18n(), { openModelSettings, openProviderSettings, openAccountSettings, openSubscriptionSettings } = useWorkspaceChrome();
-  const campaign = useBlackFridayActive();
-  const [freeGateEntryId, setFreeGateEntryId] = useState(newCampaignEntryId);
+  const { t } = useI18n(), { openModelSettings, openProviderSettings, openAccountSettings, openSubscriptionSettings } = useWorkspaceChrome();
   const trackingPage = studio ? 'creative_studio' as const : 'assets' as const;
   const studioId = studio?.destination.studio.id;
   const effectiveStudioId = studioId ?? 'assets';
-  const markFreeGateCheckoutReturn = useCheckoutReturnRefresh(trackingPage, 'studio_free_gate', {
-    studioId: effectiveStudioId,
-    modality: draft.modality,
-  });
   const scene = studio?.destination.scene;
   const imageWorkspace = studio?.destination.studio.id === 'design' && scene?.modality === 'image';
   const offerWorkspace = imageWorkspace || studio?.destination.studio.id === 'cinema';
@@ -336,13 +330,6 @@ export function AssetComposer({ active, studio, draft, setDraft, agentReferences
     }
     prevSignInGate.current = signInGateVisible;
   }, [signInGateVisible, trackingPage, effectiveStudioId, draft.modality]);
-  const prevFreeGate = useRef(false);
-  useEffect(() => {
-    if (accountNotIncluded && !prevFreeGate.current) {
-      tracking.reportEntitlementGateView(trackingPage, 'studio_free_gate', { studio_id: effectiveStudioId, modality: draft.modality });
-    }
-    prevFreeGate.current = Boolean(accountNotIncluded);
-  }, [accountNotIncluded, trackingPage, effectiveStudioId, draft.modality]);
 
   const configureProvider = (providerId: string) => {
     if (providerId === 'account') {
@@ -392,45 +379,16 @@ export function AssetComposer({ active, studio, draft, setDraft, agentReferences
       {studio && gateway && !available.length && compatible.length > 0 && !unconfiguredPreferred && (imageWorkspace
         ? manageProvidersNotice
         : <Button variant="ghost" className="om-button h-auto" onClick={openModelSettings}>{t('Configure a provider or sign in to use media models.')}</Button>)}
-      {accountNotIncluded && <div className="om-creation-setup" role="status" data-testid="studio-free-gate">
-        <RemixIcon name="bank-card-line" size={20} />
-        <p className="om-muted">{t('Signed in; multimodal generation requires OpenDesign Plus or above')}</p>
-        <div className="om-control-row">
-          <a
-            className="om-button"
-            data-primary
-            href={campaignPricingUrl(locale, 'opengame_studio_free_gate', freeGateEntryId, { studioId: effectiveStudioId, modality: draft.modality })}
-            {...pricingLinkTargetProps()}
-            onClick={() => {
-              const clickedId = freeGateEntryId;
-              markFreeGateCheckoutReturn(clickedId);
-              send('ui_click', {
-                page_name: trackingPage,
-                area: 'asset_create',
-                element: 'open_pricing',
-                hook_id: 'studio_free_gate',
-                entry_id: clickedId,
-                ...(campaign ? { campaign_id: BLACK_FRIDAY_CAMPAIGN } : {}),
-                studio_id: effectiveStudioId,
-                modality: draft.modality,
-              });
-              window.setTimeout(() => setFreeGateEntryId(newCampaignEntryId()), 0);
-            }}
-          >
-            <RemixIcon name="sparkling-line" size={15} />
-            {campaign ? t('Upgrade · 50% OFF') : t('Upgrade to Plus')}
-            <RemixIcon name="external-link-line" size={14} />
-          </a>
-          <Button variant="ghost" className="om-button h-auto" onClick={() => {
-            const entryId = tracking.newTrackingId();
-            setPendingAttribution('subscription', 'studio_free_gate', entryId, { studioId: effectiveStudioId, modality: draft.modality });
-            send('ui_click', { page_name: trackingPage, area: 'asset_create', element: 'manage_subscription', hook_id: 'studio_free_gate', entry_id: entryId, studio_id: effectiveStudioId, modality: draft.modality });
-            (openSubscriptionSettings ?? openAccountSettings ?? openModelSettings)();
-          }}>
-            {t('Manage subscription')}
-          </Button>
-        </div>
-      </div>}
+      {accountNotIncluded && (
+        <StudioFreeGateCard
+          pageName={trackingPage}
+          studioId={effectiveStudioId}
+          modality={draft.modality}
+          testId="studio-free-gate"
+          iconSize={20}
+          onManageSubscription={() => (openSubscriptionSettings ?? openAccountSettings ?? openModelSettings)()}
+        />
+      )}
       {gateway && modelId && !selected && !unconfiguredPreferred && !openDesignMissing && <p className="om-muted" role="status">{scene && <strong>{gateway.models.find(model => model.id === modelId)?.label ?? modelId} · </strong>}{t('This task’s model is unavailable. Choose a model to continue.')}</p>}
   </>;
   const modelPicker = gateway && !failed && (studio ? compatible.length > 0 : choices.length > 0) ? (studio

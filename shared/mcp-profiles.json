@@ -67,6 +67,7 @@
       "openmotion_job_manage",
       "openmotion_asset_manage",
       "openmotion_assets_use",
+      "openmotion_media_use",
       "openmotion_open_preview"
     ],
     "instructions": "Use only the OpenGame MCP tools returned by tools/list. Read openmotion://workflow/game/start (and openmotion://workflow/media/start when generating art, sprites, textures or audio) before authoring. Use opengame_* tools to create, read, edit, simulate, playtest, capture covers, validate, record trailers, publish locally or guide WeChat Mini Game export. Use openmotion_open_preview with target=game to open local Game Studio or target=providers to configure media providers. Keep user game projects in the connected local workspace; never bypass MCP or invent unverified playtest or validation results."

@@ -9,8 +9,6 @@ const actionSets = {
   openmotion_asset_manage: ['list', 'get', 'read', 'import', 'update', 'import_to_project', 'brand_kit'],
   openmotion_game_trailer: ['start', 'status'],
   openmotion_game_wechat: ['status', 'set_appid', 'confirm', 'confirm_upload', 'ip_check', 'preview', 'upload'],
-  opengame_trailer: ['start', 'status'],
-  opengame_wechat: ['status', 'set_appid', 'confirm', 'confirm_upload', 'ip_check', 'preview', 'upload'],
   openmotion_assets_use: assetActions,
   openmotion_assets: legacyAssetActions,
   openmotion_media_use: ['inspect', 'reference', 'models', 'generate', 'status', 'cancel', 'retry_save', 'resume'],
@@ -23,7 +21,7 @@ const actionSets = {
   openmotion_design_edit: ['read_file', 'write', 'list_versions', 'restore_version', 'import_asset'],
   openmotion_design_comments: ['list', 'create', 'update', 'delete'],
 } as const;
-const targets = ['project', 'templates', 'providers'] as const;
+const targets = ['project', 'templates', 'providers', 'game'] as const;
 export const capabilityExecutorKinds = ['model', 'prompt-preset', 'dedicated-model', 'service', 'script'] as const;
 export const mediaModalities = ['image', 'video', 'audio', '3d'] as const;
 export type MediaTelemetryModality = typeof mediaModalities[number];
@@ -232,10 +230,11 @@ export const toolDimensions = {
 } as const;
 
 export function toolInputFields(tool: string, input: unknown) {
+  const canonicalTool = tool.startsWith('opengame_') ? 'openmotion_game_' + tool.slice(9) : tool;
   const args = input && typeof input === 'object' && !Array.isArray(input)
     ? input as { action?: unknown; target?: unknown; modality?: unknown; capabilityId?: unknown; dryRun?: unknown; model?: unknown; templateId?: unknown; copyAttemptId?: unknown; templateEntry?: unknown }
     : {};
-  const actions: readonly typeof toolDimensions.action[number][] = Object.hasOwn(actionSets, tool) ? actionSets[tool as keyof typeof actionSets] : [];
+  const actions: readonly typeof toolDimensions.action[number][] = Object.hasOwn(actionSets, canonicalTool) ? actionSets[canonicalTool as keyof typeof actionSets] : [];
   const defaultAction =
     tool === 'openmotion_export_request'
       ? 'request'

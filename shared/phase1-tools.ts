@@ -78,6 +78,7 @@ export const gameSharedToolNames = [
   'openmotion_job_manage',
   'openmotion_asset_manage',
   'openmotion_assets_use',
+  'openmotion_media_use',
   'openmotion_open_preview',
 ] as const;
 

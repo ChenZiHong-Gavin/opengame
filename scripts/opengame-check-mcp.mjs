@@ -51,7 +51,7 @@ export function checkOpenGameTransport(config, expectedVersion, { expectedTools,
     messages.push({ jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri: verifyResourceUri } });
   }
   if (verifyGameId) {
-    messages.push({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'opengame_get', arguments: { id: verifyGameId } } });
+    messages.push({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'opengame_get', arguments: { id: verifyGameId }, _meta: { 'openmotion/internalProbe': true } } });
   }
   const environment = { ...process.env, OPENMOTION_TELEMETRY: '0', OPENGAME_AUTO_UPDATE: '0', ...(transport.env || {}), ...extraEnv };
   const result = spawnSync(transport.command, transport.args, {

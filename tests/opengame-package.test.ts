@@ -18,9 +18,10 @@ const profiles = JSON.parse(await readFile(new URL('../shared/mcp-profiles.json'
 test('game MCP profile exposes opengame_* and shared openmotion_* tools with isolated resources and aliases', () => fixture(async store => {
   const registry = mcpRegistry('game');
   const expected: string[] = profiles.game.tools;
-  assert.equal(expected.length, 19);
+  assert.equal(expected.length, 20);
   assert.equal(expected.filter(name => name.startsWith('opengame_')).length, 13);
-  assert.equal(expected.filter(name => name.startsWith('openmotion_')).length, 6);
+  assert.equal(expected.filter(name => name.startsWith('openmotion_')).length, 7);
+  assert(expected.includes('openmotion_media_use'), 'Shipped openmotion-media references call openmotion_media_use');
   assert.deepEqual(registry.tools.map(t => t.name), expected);
 
   const init: any = await rpc({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-11-25', capabilities: {} } }, store, registry);
@@ -71,6 +72,9 @@ test('game MCP profile exposes opengame_* and shared openmotion_* tools with iso
 
   const invalidPreview: any = await rpc({ jsonrpc: '2.0', id: 10, method: 'tools/call', params: { name: 'openmotion_open_preview', arguments: { target: 'game', projectId: 'project' } } }, store, registry, undefined, undefined, { callPhase1 });
   assert.equal(invalidPreview.result.isError, true);
+
+  const mediaInspect: any = await rpc({ jsonrpc: '2.0', id: 11, method: 'tools/call', params: { name: 'openmotion_media_use', arguments: { action: 'inspect' } } }, store, registry, undefined, undefined, { callPhase1 });
+  assert.equal(mediaInspect.result.isError, undefined, 'openmotion_media_use inspect must work under game profile');
 }, false));
 
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLttAAAAABJRU5ErkJggg==', 'base64');

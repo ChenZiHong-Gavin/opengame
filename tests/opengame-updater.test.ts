@@ -4,11 +4,11 @@ import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { existsSync } from 'node:fs';
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { packageOpenGame } from '../scripts/package-opengame.mjs';
-import { setup, diagnose, callInstalled } from '../scripts/opengame-launcher.mjs';
+import { setup, diagnose, callInstalled, update } from '../scripts/opengame-launcher.mjs';
 import {
   applyStagedUpdate,
   checkNpmUpdate,
@@ -17,7 +17,6 @@ import {
   retireIdleBackend,
   rollbackInstallation,
   stageNpmUpdate,
-  writeInstallState,
 } from '../scripts/opengame-updater.mjs';
 import { runFile, writeJSON } from '../scripts/runtime-assets.mjs';
 import { startServer } from '../server.ts';
@@ -157,11 +156,11 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     assert.equal(diag.status, 'passed', JSON.stringify(diag));
     assert.equal(diag.serverInfo.name, 'opengame');
     assert.equal(diag.version, v1);
-    assert.equal(diag.tools.length, 19);
+    assert.equal(diag.tools.length, 20);
 
     const listed = await callInstalled({ home, host: 'workbuddy' });
     assert.equal(listed.serverInfo.name, 'opengame');
-    assert.equal(listed.tools.length, 19);
+    assert.equal(listed.tools.length, 20);
 
     // 3. Start local mock npm registries: primary returns 503, mirror serves valid v2 + corrupted v3.
     const v2Bytes = await readFile(pkg2.installer);
@@ -224,13 +223,17 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     assert.equal(afterFailedProbe.staged, null);
     assert(afterFailedProbe.badVersions.includes(v2));
 
-    // Clear badVersions so we can stage the valid v2 package next.
-    await writeInstallState(home, { ...afterFailedProbe, badVersions: [] });
+    // Normal update and stageNpmUpdate without --force honor badVersions.
+    const blockedUpdate = await update({ home, registries: [primaryUrl, mirrorUrl], installDeps: linkDeps });
+    assert.equal(blockedUpdate.status, 'blocked_bad_version');
+    const skippedStage = await stageNpmUpdate({ home, target: check, installDeps: linkDeps });
+    assert.equal(skippedStage.status, 'skipped_bad_version');
 
-    // 7. Stage valid v2 (runs real live MCP handshake probe against v2!).
-    const staged = await stageNpmUpdate({ home, target: check, installDeps: linkDeps });
+    // 7. Force-stage retries the blacklisted v2, passes real live MCP handshake probe, and clears v2 from badVersions.
+    const staged = await stageNpmUpdate({ home, target: check, force: true, installDeps: linkDeps });
     assert.equal(staged.status, 'staged');
     assert.equal(staged.staged.version, v2);
+    assert.equal((await readInstallState(home)).badVersions.includes(v2), false, 'Successful forced probe must remove version from badVersions');
 
     // 8. Retire any real shared editor started during diagnose, then test standalone busy deferral + idle retire.
     await retireIdleBackend(dataDir);
@@ -294,32 +297,59 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     assert.equal(cleanReply.result.serverInfo.version, v2);
     assert.equal((await readInstallState(home)).current.crashCount, 0);
 
-    // 10. Simulate crash loop in unverified v2: corrupt v2/mcp.ts so it exits 1 immediately.
+    // 10. Simulate crash loop in unverified v2 with an OPEN host stdin pipe (realistic MCP host behavior).
     const v2McpPath = path.join(activeV2.current.appRoot, 'mcp.ts');
     const origV2Mcp = await readFile(v2McpPath, 'utf8');
     await writeFile(v2McpPath, 'console.error("simulated broken update"); process.exit(1);\n');
 
-    // Crash #1 increments crashCount to 1, does not roll back yet.
-    const crash1 = spawnSync(process.execPath, [path.join(home, 'run-mcp.mjs')], {
-      input: initLine,
-      encoding: 'utf8',
-      timeout: 20_000,
-      env: { ...process.env, OPENMOTION_TELEMETRY: '0', OPENGAME_AUTO_UPDATE: '0', OPENGAME_MAX_CRASHES: '2' },
+    // Crash #1 increments crashCount to 1 and exits promptly even while stdin stays open!
+    const crash1 = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }>((resolve, reject) => {
+      const child = spawn(process.execPath, [path.join(home, 'run-mcp.mjs')], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, OPENMOTION_TELEMETRY: '0', OPENGAME_AUTO_UPDATE: '0', OPENGAME_MAX_CRASHES: '2' },
+      });
+      let stderr = '';
+      child.stderr.on('data', chunk => { stderr += chunk; });
+      child.stdin.write(initLine); // Intentionally keep stdin open!
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(new Error('run-mcp.mjs hung instead of exiting when supervised server crashed with stdin open'));
+      }, 10_000);
+      child.once('close', (code, signal) => {
+        clearTimeout(timer);
+        resolve({ code, signal, stderr });
+      });
     });
-    assert.equal(crash1.status, 1);
+    assert.equal(crash1.code, 1, crash1.stderr);
     const afterCrash1 = await readInstallState(home);
     assert.equal(afterCrash1.current.version, v2);
     assert.equal(afterCrash1.current.crashCount, 1);
 
-    // Crash #2 hits maxCrashes=2 -> auto-rolls back to v1, records v2 in badVersions, restores Skills,
-    // AND transparently replays buffered `initialize` on v1 so stdout returns a valid v1 response!
-    const crash2 = spawnSync(process.execPath, [path.join(home, 'run-mcp.mjs')], {
-      input: initLine,
-      encoding: 'utf8',
-      timeout: 20_000,
-      env: { ...process.env, OPENMOTION_TELEMETRY: '0', OPENGAME_AUTO_UPDATE: '0', OPENGAME_MAX_CRASHES: '2' },
+    // Crash #2 hits maxCrashes=2 with stdin kept open -> auto-rolls back to v1, records v2 in badVersions, restores Skills,
+    // transparently replays buffered `initialize` on v1 over stdout, and exits 0 once host closes stdin!
+    const crash2 = await new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve, reject) => {
+      const child = spawn(process.execPath, [path.join(home, 'run-mcp.mjs')], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, OPENMOTION_TELEMETRY: '0', OPENGAME_AUTO_UPDATE: '0', OPENGAME_MAX_CRASHES: '2' },
+      });
+      let stdout = '';
+      let stderr = '';
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        reject(new Error(`Timed out waiting for rollback initialize reply: stdout=${stdout} stderr=${stderr}`));
+      }, 20_000);
+      child.stderr.on('data', chunk => { stderr += chunk; });
+      child.stdout.on('data', chunk => {
+        stdout += chunk;
+        if (stdout.includes('\n')) child.stdin.end();
+      });
+      child.stdin.write(initLine);
+      child.once('close', code => {
+        clearTimeout(timer);
+        resolve({ code, stdout, stderr });
+      });
     });
-    assert.equal(crash2.status, 0, crash2.stderr);
+    assert.equal(crash2.code, 0, crash2.stderr);
     const recoveredReply = JSON.parse(crash2.stdout.trim());
     assert.equal(recoveredReply.result.serverInfo.name, 'opengame');
     assert.equal(recoveredReply.result.serverInfo.version, v1);
@@ -333,15 +363,27 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     const restoredSkillMeta = JSON.parse(await readFile(path.join(workbuddyDir, 'skills', 'opengame-game', 'opengame-install.json'), 'utf8'));
     assert.equal(restoredSkillMeta.version, v1);
 
-    // Restore v2 mcp.ts and verify healthy promotion + pruning of obsolete versions + manual rollback.
+    // 11. Verify `opengame update --force` recovers the blacklisted v2 end-to-end AND can reinstall the active version.
     await writeFile(v2McpPath, origV2Mcp);
+    const forcedRecovery = await update({ home, force: true, registries: [primaryUrl, mirrorUrl], installDeps: linkDeps });
+    assert.equal(forcedRecovery.status, 'updated');
+    assert.equal(forcedRecovery.currentVersion, v2);
+    const recoveredState = await readInstallState(home);
+    assert.equal(recoveredState.current.version, v2);
+    assert.equal(recoveredState.badVersions.includes(v2), false);
+    assert.equal(recoveredState.previous.version, v1);
+
+    // Force-reinstalling the currently active version extracts a fresh copy without returning already_current and preserves previous=v1.
+    const forcedReinstall = await update({ home, force: true, registries: [primaryUrl, mirrorUrl], installDeps: linkDeps });
+    assert.equal(forcedReinstall.status, 'updated');
+    assert.equal(forcedReinstall.currentVersion, v2);
+    const reinstalledState = await readInstallState(home);
+    assert.equal(reinstalledState.current.version, v2);
+    assert.notEqual(reinstalledState.current.appRoot, recoveredState.current.appRoot);
+    assert.equal(reinstalledState.previous.version, v1);
+
+    // 12. Verify healthy promotion + pruning of obsolete versions + manual rollback.
     await mkdir(path.join(home, 'apps', '0.0.1-obsolete'), { recursive: true });
-    await writeInstallState(home, {
-      ...rolledState,
-      badVersions: [],
-      previous: { ...rolledState.current, healthy: true, crashCount: 0 },
-      current: { version: v2, sha256: activeV2.current.sha256, appRoot: activeV2.current.appRoot, activatedAt: new Date().toISOString(), healthy: false, crashCount: 0 },
-    });
     const healthyRun = spawnSync(process.execPath, [path.join(home, 'run-mcp.mjs')], {
       input: initLine,
       encoding: 'utf8',
@@ -352,6 +394,7 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     const promoted = await readInstallState(home);
     assert.equal(promoted.current.healthy, true);
     assert.equal(existsSync(path.join(home, 'apps', '0.0.1-obsolete')), false, 'Obsolete app versions should be pruned after healthy promotion');
+    assert.equal(existsSync(recoveredState.current.appRoot), false, 'Replaced same-version app directory should be pruned after healthy promotion');
 
     const manual = await rollbackInstallation({ home, reason: 'manual', markBad: true });
     assert.equal(manual.rolledBack, true);

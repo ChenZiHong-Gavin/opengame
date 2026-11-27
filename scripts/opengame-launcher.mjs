@@ -116,7 +116,8 @@ async function installLauncherSupport(home) {
     "import { fileURLToPath } from 'node:url';",
     "import { runManagedMcp } from './launcher/opengame-updater.mjs';",
     'const home = path.dirname(fileURLToPath(import.meta.url));',
-    'process.exitCode = await runManagedMcp({ home });',
+    'const code = await runManagedMcp({ home });',
+    'process.exit(code);',
     '',
   ].join('\n'));
   return launcher;
@@ -417,6 +418,7 @@ export async function update(options = {}) {
   const staged = await stageNpmUpdate({
     home,
     target: check,
+    force: Boolean(options.force),
     fetchImpl: options.fetchImpl,
     registries: options.registries,
     installDeps: options.installDeps,
@@ -495,7 +497,8 @@ async function main() {
       manifest: values.manifest,
       autoUpdate: values['no-auto-update'] ? false : undefined,
     });
-    process.exitCode = await runManagedMcp({ home });
+    const code = await runManagedMcp({ home });
+    process.exit(code);
   } else if (command === 'update') {
     console.log(JSON.stringify(await update({ home: values.home, check: Boolean(values.check), force: Boolean(values.force) }), null, 2));
   } else if (command === 'rollback') {

@@ -215,15 +215,20 @@ export async function installProductionDeps(directory, registries) {
   throw lastError;
 }
 
-export async function installApplicationArchive({ home, archivePath, manifest, installDeps, registries }) {
+export async function installApplicationArchive({ home, archivePath, manifest, installDeps, registries, force = false, excludeAppRoot = null }) {
   assert(manifest?.schemaVersion === 1 && typeof manifest.version === 'string', 'Invalid OpenGame release manifest');
   assert.equal(manifest.mcp?.profile, 'game', 'Package manifest is not an OpenGame game profile');
   assert(/^[a-f0-9]{64}$/.test(manifest.application?.sha256), 'Missing pinned application SHA256');
   assert.equal(await sha256(archivePath), manifest.application.sha256, 'Application archive SHA256 mismatch');
-  const appRoot = path.join(home, 'apps', `${manifest.version}-${manifest.application.sha256.slice(0, 16)}`);
-  const existing = await readJSON(path.join(appRoot, '.npm-install.json'));
-  if (existing && existing.applicationSHA256 === manifest.application.sha256) {
-    return appRoot;
+  let appRoot = path.join(home, 'apps', `${manifest.version}-${manifest.application.sha256.slice(0, 16)}`);
+  if (force && excludeAppRoot && path.resolve(appRoot) === path.resolve(excludeAppRoot)) {
+    appRoot = `${appRoot}-${randomUUID().slice(0, 8)}`;
+  }
+  if (!force) {
+    const existing = await readJSON(path.join(appRoot, '.npm-install.json'));
+    if (existing && existing.applicationSHA256 === manifest.application.sha256) {
+      return appRoot;
+    }
   }
   await mkdir(path.join(home, 'apps'), { recursive: true });
   const temporary = await mkdtemp(path.join(home, 'apps', '.stage-'));
@@ -380,6 +385,7 @@ async function recordBadVersion(home, version) {
 export async function stageNpmUpdate({
   home,
   target,
+  force = false,
   fetchImpl = fetch,
   registries,
   installDeps,
@@ -389,13 +395,13 @@ export async function stageNpmUpdate({
   return withCacheLock(path.join(home, 'update.lock'), async () => {
     const state = await readInstallState(home);
     assert(state?.managedBy === managedBy, 'Installation directory is not managed by OpenGame');
-    if (state.current.version === target.version) {
+    if (!force && state.current.version === target.version) {
       return { status: 'already_current', version: target.version };
     }
-    if (state.staged?.version === target.version) {
+    if (!force && state.staged?.version === target.version) {
       return { status: 'already_staged', staged: state.staged };
     }
-    if ((state.badVersions || []).includes(target.version)) {
+    if (!force && (state.badVersions || []).includes(target.version)) {
       return { status: 'skipped_bad_version', version: target.version };
     }
     const safeName = (state.packageName || 'opengame').replace(/[^a-z0-9._-]/gi, '_');
@@ -413,7 +419,15 @@ export async function stageNpmUpdate({
       assert.equal(manifest?.version, target.version, 'Embedded release manifest version mismatch');
       assert.equal(manifest?.mcp?.profile, 'game', 'Downloaded npm package is not an OpenGame game profile');
       const archivePath = path.resolve(path.join(pkgDir, 'payload'), manifest.application.url);
-      appRoot = await installApplicationArchive({ home, archivePath, manifest, installDeps, registries });
+      appRoot = await installApplicationArchive({
+        home,
+        archivePath,
+        manifest,
+        installDeps,
+        registries,
+        force,
+        excludeAppRoot: state.current?.appRoot,
+      });
       const expectedTools = (await readJSON(path.join(appRoot, 'shared/mcp-profiles.json'))).game.tools;
       try {
         probeTransport(
@@ -432,7 +446,8 @@ export async function stageNpmUpdate({
         appRoot,
         stagedAt: new Date().toISOString(),
       };
-      await writeInstallState(home, { ...state, staged, lastUpdateCheckAt: new Date().toISOString() });
+      const badVersions = (state.badVersions || []).filter(version => version !== target.version);
+      await writeInstallState(home, { ...state, staged, badVersions, lastUpdateCheckAt: new Date().toISOString() });
       return { status: 'staged', staged };
     } finally {
       await rm(extractRoot, { recursive: true, force: true });
@@ -454,7 +469,10 @@ export async function applyStagedUpdate({ home, fetchImpl = fetch } = {}) {
     if (retirement.busy) {
       return { applied: false, reason: 'backend_busy', active: retirement.active };
     }
-    const previous = { ...state.current, healthy: true, crashCount: 0 };
+    const previousVersion = state.current.version;
+    const previous = state.current.version === state.staged.version
+      ? (state.previous || null)
+      : { ...state.current, healthy: true, crashCount: 0 };
     const current = {
       version: state.staged.version,
       sha256: state.staged.sha256,
@@ -465,7 +483,7 @@ export async function applyStagedUpdate({ home, fetchImpl = fetch } = {}) {
     };
     const next = await writeInstallState(home, { ...state, current, previous, staged: null });
     await syncInstalledHostSkills(next, current.appRoot, current.version).catch(() => {});
-    return { applied: true, version: current.version, previousVersion: previous.version, retirement };
+    return { applied: true, version: current.version, previousVersion, retirement };
   });
 }
 
@@ -674,7 +692,7 @@ export async function runManagedMcp({
         if (activeChild === child) activeChild = null;
         resolve({ code: 1, signal: null, error });
       });
-      child.once('exit', (code, signal) => {
+      child.once('close', (code, signal) => {
         if (healthTimer) clearTimeout(healthTimer);
         if (activeChild === child) activeChild = null;
         resolve({ code: code ?? (signal ? 1 : 0), signal });
@@ -694,10 +712,25 @@ export async function runManagedMcp({
       }
     }
     if (promotionPromise) await promotionPromise;
+    if (stdoutEmitted && process.stdout.writableNeedDrain) {
+      await new Promise(resolve => {
+        const done = () => {
+          process.stdout.off('drain', done);
+          process.stdout.off('close', done);
+          process.stdout.off('error', done);
+          resolve();
+        };
+        process.stdout.once('drain', done);
+        process.stdout.once('close', done);
+        process.stdout.once('error', done);
+      });
+    }
     return outcome.code;
   } finally {
     process.stdin.off('data', onStdinData);
     process.stdin.off('end', onStdinEnd);
+    process.stdin.pause();
+    process.stdin.unref?.();
     process.off('SIGTERM', onSignal);
     process.off('SIGINT', onSignal);
   }

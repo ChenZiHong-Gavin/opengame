@@ -396,7 +396,9 @@
     "Auto-generate multimodal assets": "自动生成多模态素材",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "创作任务中默认自动调用多模态模型生成图片、视频和音频；关闭后每次生成前需手动确认。",
     "Settings saved": "设置已保存",
-    "Could not save setting.": "无法保存设置。"
+    "Could not save setting.": "无法保存设置。",
+    "Sign-in was interrupted. Sign in again.": "登录已中断，请重新登录。",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "登录组件安装超时。请检查网络连接后重试。"
   },
   "ja": {
     "Go back": "戻る",
@@ -564,7 +566,9 @@
     "Auto-generate multimodal assets": "マルチモーダル素材を自動生成",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "タスク内で AI 画像・動画・音声を自動生成します。オフにすると毎回生成前に確認します。",
     "Settings saved": "設定を保存しました",
-    "Could not save setting.": "設定を保存できませんでした。"
+    "Could not save setting.": "設定を保存できませんでした。",
+    "Sign-in was interrupted. Sign in again.": "ログインが中断されました。もう一度ログインしてください。",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "ログイン用コンポーネントのインストールがタイムアウトしました。接続を確認して再試行してください。"
   },
   "ko": {
     "Go back": "뒤로",
@@ -627,7 +631,9 @@
     "Auto-generate multimodal assets": "멀티모달 에셋 자동 생성",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "작업 중 AI 이미지, 동영상, 오디오를 자동으로 생성합니다. 끄면 생성할 때마다 확인을 요청합니다.",
     "Settings saved": "설정이 저장되었습니다",
-    "Could not save setting.": "설정을 저장할 수 없습니다."
+    "Could not save setting.": "설정을 저장할 수 없습니다.",
+    "Sign-in was interrupted. Sign in again.": "로그인이 중단되었습니다. 다시 로그인하세요.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "로그인 구성 요소 설치 시간이 초과되었습니다. 연결을 확인하고 다시 시도하세요."
   },
   "de": {
     "Go back": "Zurück",
@@ -690,7 +696,9 @@
     "Auto-generate multimodal assets": "Multimodale Assets automatisch generieren",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "KI-Bilder, -Videos und -Audio in Aufgaben automatisch generieren. Deaktivieren, um vor jeder Generierung zu bestätigen.",
     "Settings saved": "Einstellungen gespeichert",
-    "Could not save setting.": "Einstellung konnte nicht gespeichert werden."
+    "Could not save setting.": "Einstellung konnte nicht gespeichert werden.",
+    "Sign-in was interrupted. Sign in again.": "Die Anmeldung wurde unterbrochen. Melden Sie sich erneut an.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "Die Installation der Anmeldekomponente dauerte zu lange. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut."
   },
   "fr": {
     "Go back": "Retour",
@@ -753,7 +761,9 @@
     "Auto-generate multimodal assets": "Générer automatiquement les médias multimodaux",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "Génère automatiquement les images, vidéos et pistes audio IA pendant les tâches. Désactivez pour confirmer avant chaque génération.",
     "Settings saved": "Paramètres enregistrés",
-    "Could not save setting.": "Impossible d’enregistrer le paramètre."
+    "Could not save setting.": "Impossible d’enregistrer le paramètre.",
+    "Sign-in was interrupted. Sign in again.": "La connexion a été interrompue. Reconnectez-vous.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "Le délai d’installation du composant de connexion a expiré. Vérifiez votre connexion et réessayez."
   },
   "ru": {
     "Go back": "Назад",
@@ -816,7 +826,9 @@
     "Auto-generate multimodal assets": "Автогенерация мультимодальных материалов",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "Автоматически генерировать ИИ-изображения, видео и аудио в задачах. Отключите, чтобы подтверждать каждую генерацию.",
     "Settings saved": "Настройки сохранены",
-    "Could not save setting.": "Не удалось сохранить настройку."
+    "Could not save setting.": "Не удалось сохранить настройку.",
+    "Sign-in was interrupted. Sign in again.": "Вход прерван. Войдите снова.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "Время установки компонента входа истекло. Проверьте подключение и повторите попытку."
   },
   "es": {
     "Go back": "Volver",
@@ -879,7 +891,9 @@
     "Auto-generate multimodal assets": "Generar recursos multimodales automáticamente",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "Genera automáticamente imágenes, vídeo y audio con IA en las tareas. Desactívalo para confirmar antes de cada generación.",
     "Settings saved": "Configuración guardada",
-    "Could not save setting.": "No se pudo guardar el ajuste."
+    "Could not save setting.": "No se pudo guardar el ajuste.",
+    "Sign-in was interrupted. Sign in again.": "Se interrumpió el inicio de sesión. Vuelve a iniciar sesión.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "La instalación del componente de acceso agotó el tiempo de espera. Comprueba la conexión y vuelve a intentarlo."
   },
   "pt-BR": {
     "Go back": "Voltar",
@@ -942,7 +956,9 @@
     "Auto-generate multimodal assets": "Gerar recursos multimodais automaticamente",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "Gera automaticamente imagens, vídeos e áudios de IA nas tarefas. Desative para confirmar antes de cada geração.",
     "Settings saved": "Configurações salvas",
-    "Could not save setting.": "Não foi possível salvar a configuração."
+    "Could not save setting.": "Não foi possível salvar a configuração.",
+    "Sign-in was interrupted. Sign in again.": "O login foi interrompido. Entre novamente.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "A instalação do componente de login excedeu o tempo limite. Verifique a conexão e tente novamente."
   },
   "it": {
     "Go back": "Indietro",
@@ -1005,7 +1021,9 @@
     "Auto-generate multimodal assets": "Genera automaticamente risorse multimodali",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "Genera automaticamente immagini, video e audio IA nelle attività. Disattiva per confermare prima di ogni generazione.",
     "Settings saved": "Impostazioni salvate",
-    "Could not save setting.": "Impossibile salvare l’impostazione."
+    "Could not save setting.": "Impossibile salvare l’impostazione.",
+    "Sign-in was interrupted. Sign in again.": "Accesso interrotto. Accedi di nuovo.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "Installazione del componente di accesso scaduta. Controlla la connessione e riprova."
   },
   "tr": {
     "Go back": "Geri",
@@ -1068,6 +1086,8 @@
     "Auto-generate multimodal assets": "Çok modlu varlıkları otomatik oluştur",
     "Automatically generate AI images, video, and audio in tasks. Turn off to confirm before each generation.": "Görevlerde yapay zeka görsellerini, videolarını ve seslerini otomatik oluşturur. Her oluşturma öncesi onaylamak için kapatın.",
     "Settings saved": "Ayarlar kaydedildi",
-    "Could not save setting.": "Ayar kaydedilemedi."
+    "Could not save setting.": "Ayar kaydedilemedi.",
+    "Sign-in was interrupted. Sign in again.": "Oturum açma kesintiye uğradı. Yeniden oturum açın.",
+    "The sign-in component installation timed out. Check your connection and select Retry.": "Oturum açma bileşeninin kurulumu zaman aşımına uğradı. Bağlantınızı kontrol edip yeniden deneyin."
   }
 }

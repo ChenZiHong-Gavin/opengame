@@ -3,6 +3,7 @@ import { StrictMode, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccountSummary } from '../../../shared/provider-directory';
+import { currentProductId } from '../../../shared/product-identity';
 import type { SuperAgentActionCard } from '../../../shared/super-agent';
 import { I18nProvider } from '../i18n/I18n';
 import { gatewayRequest } from '../motion/gatewayClient';
@@ -105,7 +106,7 @@ describe('AccountHandoffCard', () => {
     const href = plansLink('Upgrade to Plus').getAttribute('href');
     expect(href).toContain('open-design.ai/');
     const parsedHref = new URL(href!);
-    expect(parsedHref.searchParams.get('od_origin')).toBe('opengame');
+    expect(parsedHref.searchParams.get('od_origin')).toBe(currentProductId());
     expect(parsedHref.searchParams.get('od_entry_source')).toBe('studio_free_gate');
     expect(parsedHref.searchParams.get('od_placement_id')).toBe('gui__studio__game__all');
     expect(parsedHref.searchParams.has('utm_medium')).toBe(false);

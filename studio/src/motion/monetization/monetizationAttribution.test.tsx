@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GenerationJob, Model } from '../../../../shared/gateway';
+import { currentProductId } from '../../../../shared/product-identity';
 import { findMediaStudio } from '../../../../shared/studio-catalog';
 import { I18nProvider } from '../../i18n/I18n';
 import { AssetComposer, type AssetDraft } from '../AssetComposer';
@@ -232,7 +233,7 @@ describe('Scene-isolated monetization gate attribution (Motion, Assets, Design) 
     const upgradeLink = container.querySelector<HTMLAnchorElement>('a[href*="pricing"]')!;
     expect(upgradeLink).not.toBeNull();
     const upgradeUrl = new URL(upgradeLink.href);
-    expect(upgradeUrl.searchParams.get('od_origin')).toBe('opengame');
+    expect(upgradeUrl.searchParams.get('od_origin')).toBe(currentProductId());
     expect(upgradeUrl.searchParams.get('od_entry_source')).toBe('studio_free_gate');
     expect(upgradeUrl.searchParams.get('od_placement_id')).toBe('gui__studio__assets__audio');
     expect(upgradeUrl.searchParams.has('utm_source')).toBe(false);

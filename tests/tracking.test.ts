@@ -657,7 +657,7 @@ test('provider setup handoff tracks MCP entries exclusively without counting Web
 test('upgrade links track one result per stdio and HTTP MCP inspect, excluding WebMCP calls', t => withTelemetryEnvUnlocked(() => fixture(async store => {
   const { rpc } = await import('../mcp.ts');
   const { gatewayFor } = await import('../gateway/service.ts');
-  const { decodeMonetizationShortlink } = await import('../shared/product-identity.ts');
+  const { decodeMonetizationShortlink, PRODUCT_ID } = await import('../shared/product-identity.ts');
   const events: PendingEvent[] = [];
   const tracking = core(async batch => { events.push(...batch); return 'accepted'; });
   store.tracking = tracking;
@@ -686,7 +686,7 @@ test('upgrade links track one result per stdio and HTTP MCP inspect, excluding W
       version: 'v1',
       target: 'd',
       entryId: upgrade.entryId,
-      product: 'opengame',
+      product: PRODUCT_ID,
       channel: expected.channel,
       host: expected.host,
       touchpoint: expected.touchpoint,
@@ -811,7 +811,7 @@ for (const plan of ['free', 'go'] as const) {
     const { rpc } = await import('../mcp.ts');
     const { gatewayFor } = await import('../gateway/service.ts');
     const { buildOpenMotionWebMcpTools } = await import('../shared/webmcp-tools.ts');
-    const { decodeMonetizationShortlink } = await import('../shared/product-identity.ts');
+    const { decodeMonetizationShortlink, PRODUCT_ID } = await import('../shared/product-identity.ts');
     const events: PendingEvent[] = [];
     const tracking = core(async batch => { events.push(...batch); return 'accepted'; });
     store.tracking = tracking;
@@ -831,7 +831,7 @@ for (const plan of ['free', 'go'] as const) {
       const decoded = decodeMonetizationShortlink(value.upgrade.url);
       assert.ok(decoded);
       assert.equal(decoded.entryId, value.upgrade.entryId);
-      assert.equal(decoded.product, 'opengame');
+      assert.equal(decoded.product, PRODUCT_ID);
       assert.equal(decoded.channel, expectedChannel);
       assert.equal(decoded.touchpoint, `agent_media_upgrade_${plan}`);
       assert.equal(Object.hasOwn(value, '_upgradeLinkResult'), false);

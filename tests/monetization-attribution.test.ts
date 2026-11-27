@@ -123,7 +123,7 @@ test('9-segment monetization shortlink codec matches RFC 4648 Base64URL byte-for
   assert.equal(decodeMonetizationShortlink(Buffer.from('v1|d|only|four').toString('base64url')), null);
 });
 
-test('posthogCommonProperties keeps product=openmotion, adds source_product=opengame, and preserves event channel', async () => {
+test('posthogCommonProperties keeps product=openmotion, adds resolved source_product, and preserves event channel', async () => {
   const installationId = randomUUID();
   const common = posthogCommonProperties({
     endpoint: { env: 'test' },
@@ -139,7 +139,7 @@ test('posthogCommonProperties keeps product=openmotion, adds source_product=open
   });
   assert.equal(common.product, 'openmotion');
   assert.equal(common.source_product, PRODUCT_ID);
-  assert.equal(common.source_product, 'opengame');
+  assert.ok(common.source_product === 'openmotion' || common.source_product === 'opengame');
   assert.equal(common.channel, 'standalone');
 
   const batches: any[] = [];
@@ -180,14 +180,14 @@ test('posthogCommonProperties keeps product=openmotion, adds source_product=open
     const [upgradeEvent, setupEvent] = batches[0].batch;
     assert.equal(upgradeEvent.event, 'upgrade_link_result');
     assert.equal(upgradeEvent.properties.product, 'openmotion');
-    assert.equal(upgradeEvent.properties.source_product, 'opengame');
+    assert.equal(upgradeEvent.properties.source_product, PRODUCT_ID);
     assert.equal(upgradeEvent.properties.channel, 'mcp_http');
     assert.equal(upgradeEvent.properties.studio_id, 'motion');
     assert.equal(upgradeEvent.properties.modality, 'video');
 
     assert.equal(setupEvent.event, 'provider_setup_opened');
     assert.equal(setupEvent.properties.product, 'openmotion');
-    assert.equal(setupEvent.properties.source_product, 'opengame');
+    assert.equal(setupEvent.properties.source_product, PRODUCT_ID);
     assert.equal(setupEvent.properties.channel, 'standalone');
     assert.equal(setupEvent.properties.studio_id, 'game');
   } finally {
@@ -380,7 +380,7 @@ test('previewTrackingContext preserves /settings/providers tracking_context and 
     const signInEvent = events.find(event => event.event === 'account_sign_in_result');
     assert.ok(signInEvent, 'account_sign_in_result must be emitted');
     assert.equal(signInEvent.host_context?.host_agent, 'codex');
-    assert.equal(signInEvent.properties.source_product, 'opengame');
+    assert.equal(signInEvent.properties.source_product, PRODUCT_ID);
     assert.equal(signInEvent.properties.hook_id, 'studio_generate');
     assert.equal(signInEvent.properties.entry_id, entryId);
     assert.equal(signInEvent.properties.entry_from, 'agent_game_publish_signed_out');

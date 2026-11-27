@@ -7,7 +7,7 @@ import { gatewayFor } from '../gateway/service.ts';
 import { mediaUse, resetBalanceLowRecords } from '../gateway/media-use.ts';
 import { assetOperation } from '../gateway/asset-operations.ts';
 import { jobManage } from '../gateway/capability-center.ts';
-import { cleanBillingUrl, decodeMonetizationShortlink } from '../shared/product-identity.ts';
+import { cleanBillingUrl, decodeMonetizationShortlink, PRODUCT_ID } from '../shared/product-identity.ts';
 import { saveTrackingPreference } from '../shared/tracking.ts';
 import { uuid } from '../tracking/core.ts';
 
@@ -67,7 +67,7 @@ for (const plan of ['free', 'go'] as const) {
         version: 'v1',
         target: 'd',
         entryId,
-        product: 'opengame',
+        product: PRODUCT_ID,
         channel: 'mcp_stdio',
         host: 'unknown',
         touchpoint: `agent_media_upgrade_${plan}`,
@@ -216,7 +216,7 @@ test('BALANCE_LOW job status deduplicates _upgradeLinkResult per job.id across p
     version: 'v1',
     target: 'r',
     entryId: first.topup.entryId,
-    product: 'opengame',
+    product: PRODUCT_ID,
     channel: 'mcp_http',
     host: 'cursor',
     touchpoint: 'agent_media_balance_low',
@@ -239,6 +239,11 @@ test('BALANCE_LOW job status deduplicates _upgradeLinkResult per job.id across p
   assert.deepEqual(second.topup, first.topup);
   assert.deepEqual(second.settingsHandoff, first.settingsHandoff);
   assert.equal(Object.hasOwn(second, '_upgradeLinkResult'), false);
+
+  // Studio GUI assetOperation (including asset-chat) never exposes topup/_upgradeLinkResult and must not consume MCP dedup.
+  const assetGuiRes: any = await assetOperation(store, { action: 'status', jobId: assetJob.id }, undefined, undefined, 'gui');
+  assert.equal(Object.hasOwn(assetGuiRes, 'topup'), false);
+  assert.equal(Object.hasOwn(assetGuiRes, '_upgradeLinkResult'), false);
 
   // Asset library job via assetOperation and jobManage sets studio_id='assets' and shares the per-jobId dedup.
   const assetFirst: any = await assetOperation(store, { action: 'status', jobId: assetJob.id }, undefined, undefined, 'mcp', host, 'mcp_stdio');

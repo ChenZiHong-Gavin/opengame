@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { attributedEntryId } from '../../../../shared/product-identity';
+import { attributedEntryId, currentProductId } from '../../../../shared/product-identity';
 import { validProperties } from '../../../../tracking/core.ts';
 import { studioEvents } from '../../../../tracking/events.ts';
 import { I18nProvider } from '../../i18n/I18n';
@@ -52,7 +52,7 @@ describe('OpenGame monetization attribution & gate hooks', () => {
     const id = '7d1c6f4e-6a1f-4c55-9a43-0c7a4a0a8f11';
     const url = new URL(campaignPricingUrl('zh-CN', 'opengame_balance_gate', id, { studioId: 'motion', modality: 'video' }));
     expect(url.searchParams.get('od_entry_id')).toBe(attributedEntryId(id));
-    expect(url.searchParams.get('od_origin')).toBe('opengame');
+    expect(url.searchParams.get('od_origin')).toBe(currentProductId());
     expect(url.searchParams.get('od_entry_source')).toBe('balance_gate_topup');
     expect(url.searchParams.get('od_placement_id')).toBe('gui__studio__motion__video');
     expect(url.searchParams.has('utm_source')).toBe(false);
@@ -277,7 +277,7 @@ describe('OpenGame monetization attribution & gate hooks', () => {
     const cta = document.querySelector<HTMLAnchorElement>('[data-testid="monetization-gate-cta"]')!;
     cta.addEventListener('click', event => event.preventDefault());
     const url = new URL(cta.href);
-    expect(url.searchParams.get('od_origin')).toBe('opengame');
+    expect(url.searchParams.get('od_origin')).toBe(currentProductId());
     expect(url.searchParams.get('od_entry_source')).toBe('balance_gate_topup');
     expect(url.searchParams.get('od_entry_id')).toBe(attributedEntryId(seededEntryId));
     expect(url.searchParams.get('od_placement_id')).toBe('gui__studio__motion__video');

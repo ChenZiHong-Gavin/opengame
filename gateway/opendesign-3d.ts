@@ -1391,11 +1391,15 @@ async function runMeshyOperation(input: {
   }
 
   const rigType = params.rig_type === 'quadruped' ? 'quadruped' : 'biped';
-  const animate = async (rigTaskId: string) => {
-    const { actionIds, labels } = await resolveMeshyActionIds(client, input.animationRequests, rigType);
-    if (actionIds.length === 0) {
+  // Library lookups are free; resolve clip names before any paid base/rig task so a bad name fails up front.
+  const resolveActions = async () => {
+    const resolved = await resolveMeshyActionIds(client, input.animationRequests, rigType);
+    if (resolved.actionIds.length === 0) {
       throw new Error('3d-asset Meshy animation requires at least one animation (options.rigPreset, parameters.animation(s), or parameters.action_ids)');
     }
+    return resolved;
+  };
+  const animate = async (rigTaskId: string, { actionIds, labels }: { actionIds: number[]; labels: string[] }) => {
     const task = await submitAndWaitMeshyTask(client, 'animations', {
       rig_task_id: rigTaskId,
       ...(actionIds.length === 1 ? { action_id: actionIds[0] } : { action_ids: actionIds }),
@@ -1414,7 +1418,7 @@ async function runMeshyOperation(input: {
     if (refs.length > 0) {
       throw new Error('3d-asset operation=retarget operates on parameters.original_model_task_id and does not accept reference images');
     }
-    const { task, labels } = await animate(input.originalTaskId);
+    const { task, labels } = await animate(input.originalTaskId, await resolveActions());
     return { finalTask: toResult(task, 'animations'), rigTaskId: input.originalTaskId, retargetRan: true, animationLabels: labels };
   }
 
@@ -1422,6 +1426,7 @@ async function runMeshyOperation(input: {
   if (input.originalTaskId && refs.length > 0) {
     throw new Error(`3d-asset operation=${operation} with parameters.original_model_task_id does not accept reference images`);
   }
+  const resolvedActions = operation === 'rig_retarget' ? await resolveActions() : undefined;
   let baseTaskId = input.originalTaskId;
   if (!baseTaskId) {
     if (refs.length === 0 && !prompt) {
@@ -1449,7 +1454,7 @@ async function runMeshyOperation(input: {
   if (operation === 'rig') {
     return { finalTask: toResult(rigTask, 'rigging'), baseTaskId, rigTaskId: rigTask.id, retargetRan: false, animationLabels: [] };
   }
-  const { task, labels } = await animate(rigTask.id);
+  const { task, labels } = await animate(rigTask.id, resolvedActions ?? await resolveActions());
   return { finalTask: toResult(task, 'animations'), baseTaskId, rigTaskId: rigTask.id, retargetRan: true, animationLabels: labels };
 }
 

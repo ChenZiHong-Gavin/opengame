@@ -1640,6 +1640,21 @@ test('3d-asset runs on the native Meshy API from MESHY_API_KEY: text preview+ref
       );
       assert.equal(submitted.length, beforeUnsupported);
 
+      // Animation names are resolved against the free library lookup before any paid base or rig task.
+      await assert.rejects(
+        api.call('openmotion_capability_run', {
+          action: 'run',
+          requestId: 'meshy-rig-unknown-clip-1',
+          capabilityId: '3d-asset',
+          model: 'meshy:meshy-7.1',
+          prompt: 'Knight in armor',
+          options: { operation: 'rig_retarget' },
+          parameters: { animations: ['moonwalk'] },
+        }),
+        /Meshy animation "moonwalk" was not found/,
+      );
+      assert.equal(submitted.length, beforeUnsupported);
+
       // Blank or non-numeric action_ids entries are dropped instead of coercing to action 0.
       await api.call('openmotion_capability_run', {
         action: 'run',

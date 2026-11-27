@@ -34,6 +34,22 @@ async function fixture(run: (service: GameProjects, workspace: string) => Promis
   finally { await rm(dir,{recursive:true,force:true}); }
 }
 
+test('one read_file call accepts an exact displayed or localized game title', () => fixture(async (service, workspace) => {
+  const { game } = await service.create(brief);
+  await service.updateMeta(game.id, { title: 'Space Racer', i18n: { 'zh-CN': { title: '太空赛车' } } });
+  const source = { path: 'index.html', content: '<!doctype html><title>Space Racer</title>' };
+  await service.write(game.id, [source]);
+  for (const title of ['  SPACE RACER ', '太空赛车']) {
+    assert.deepEqual(await dispatchGameTool('openmotion_game_read_file', { title, path: source.path }, workspace), source);
+  }
+  await assert.rejects(dispatchGameTool('openmotion_game_read_file', { title: 'Space', path: source.path }, workspace), /No game/);
+  await assert.rejects(dispatchGameTool('openmotion_game_read_file', { title: 'Space Racer', path: '../index.html' }, workspace), /path|traversal/i);
+  const { game: other } = await service.create(brief);
+  await service.updateMeta(other.id, { title: 'Space Racer' });
+  await assert.rejects(dispatchGameTool('openmotion_game_read_file', { title: 'Space Racer', path: source.path }, workspace), /Pass the game ID/);
+  assert.deepEqual(await dispatchGameTool('openmotion_game_read_file', { id: game.id, path: source.path }, workspace), source);
+}));
+
 test('renaming a game updates the entry title and preserves it across Agent edits', () => fixture(async service => {
   const { game } = await service.create(brief);
   const source = '<!doctype html><html><head><!-- <title>Comment</title> --><script>const other = "<title>Script</title>";</script><title>Old title</title></head><body><svg><title>Icon</title></svg></body></html>';

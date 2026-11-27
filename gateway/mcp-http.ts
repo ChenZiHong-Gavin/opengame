@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypt
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import path from 'node:path';
 import { rpc, releaseRegistry, modernMcpServer, type McpRpcOptions } from '../mcp.ts';
-import { hasMcpEnvelope, loadModernMcpSdk, modernMcpVersion } from '../shared/mcp-modern.ts';
+import { hasMcpEnvelope, loadModernMcpSdk, modernMcpVersion, withMcpDiscoveryEnvelope } from '../shared/mcp-modern.ts';
 import {
   MCP_HTTP_PATH,
   MCP_TOKEN_PREFIX,
@@ -379,17 +379,24 @@ export class McpHttpGateway {
     };
     const modernHeader = req.headers['mcp-protocol-version'];
     const claimsModern = typeof modernHeader === 'string' && modernHeader >= modernMcpVersion;
-    const sendModern = async (payload?: unknown) => {
+    const sendModern = async (payload?: unknown, bareDiscovery = false) => {
       const headers = new Headers();
       for (const [name, value] of Object.entries(req.headers)) {
         for (const entry of Array.isArray(value) ? value : [value]) {
           if (entry !== undefined) headers.append(name, entry);
         }
       }
+      if (bareDiscovery) {
+        headers.set('Mcp-Protocol-Version', modernMcpVersion);
+        if (!headers.has('Mcp-Method')) headers.set('Mcp-Method', 'server/discover');
+      }
       const request = new Request('http://localhost' + MCP_HTTP_PATH, { method: req.method, headers });
       const sdk = await loadModernMcpSdk();
       const reply = await sdk.runModernMcpHttp(request, payload, () => modernMcpServer(sdk, this.store, rpcOptions));
-      res.writeHead(reply.status, reply.headers);
+      res.writeHead(reply.status, {
+        ...reply.headers,
+        ...(reply.status >= 200 && reply.status < 300 ? { 'Mcp-Protocol-Version': modernMcpVersion } : {}),
+      });
       res.end(reply.body);
     };
     if (claimsModern && req.method !== 'POST') {
@@ -473,8 +480,9 @@ export class McpHttpGateway {
       return;
     }
 
-    if (claimsModern || (Array.isArray(payload) ? payload.some(hasMcpEnvelope) : hasMcpEnvelope(payload))) {
-      await sendModern(payload);
+    const discovery = modernHeader === undefined && !requestedSessionId ? withMcpDiscoveryEnvelope(payload) : payload;
+    if (claimsModern || discovery !== payload || (Array.isArray(payload) ? payload.some(hasMcpEnvelope) : hasMcpEnvelope(payload))) {
+      await sendModern(discovery, discovery !== payload);
       return;
     }
 

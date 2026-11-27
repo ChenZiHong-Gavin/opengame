@@ -83,40 +83,36 @@ function readNodeBuiltins(): { proc: NodeProcessLike; fs: NodeFsLike; path: Node
   return { proc, fs, path, url };
 }
 
-function readGitConfigTexts(rootDir: string, fs: NodeFsLike, path: NodePathLike): string[] {
-  const gitEntry = path.join(rootDir, '.git');
-  let info: { isDirectory(): boolean; isFile(): boolean };
+function worktreeProductId(rootDir: string, proc: NodeProcessLike): ProductId | undefined {
+  const child = proc.getBuiltinModule?.('node:child_process') as typeof import('node:child_process') | undefined;
   try {
-    info = fs.statSync(gitEntry);
+    // A host can start a worktree whose common Git directory is outside its
+    // sandbox. Read that metadata in a bounded child so MCP startup can continue.
+    const config = child?.execFileSync('git', ['config', '--local', '--no-includes', '--get-regexp', '^remote\\.(origin|upstream)\\.url$'], {
+      cwd: rootDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 500, killSignal: 'SIGKILL', windowsHide: true,
+    });
+    const remote = (key: 'origin' | 'upstream') => {
+      const prefix = 'remote.' + key + '.url ';
+      return config?.split(/\r?\n/).find(line => line.startsWith(prefix))?.slice(prefix.length);
+    };
+    return productIdFromRepositoryRef(remote('origin')) ?? productIdFromRepositoryRef(remote('upstream'));
   } catch {
-    return [];
+    return undefined;
   }
-  const candidates: string[] = [];
-  if (info.isDirectory()) {
-    candidates.push(path.join(gitEntry, 'config'));
-  } else if (info.isFile()) {
-    try {
-      const pointer = fs.readFileSync(gitEntry, 'utf8');
-      const match = /^gitdir:\s*(.+)$/im.exec(pointer);
-      if (match?.[1]) {
-        const gitDir = path.resolve(rootDir, match[1].trim());
-        candidates.push(path.join(gitDir, 'config'));
-        try {
-          const commonDirRaw = fs.readFileSync(path.join(gitDir, 'commondir'), 'utf8').trim();
-          if (commonDirRaw) {
-            candidates.push(path.join(path.resolve(gitDir, commonDirRaw), 'config'));
-          }
-        } catch { /* Standard non-worktree gitfile has no commondir. */ }
-      }
-    } catch { /* Ignore unreadable .git file. */ }
-  }
-  const contents: string[] = [];
-  for (const configPath of candidates) {
-    try {
-      contents.push(fs.readFileSync(configPath, 'utf8'));
-    } catch { /* Ignore missing config candidate. */ }
-  }
-  return contents;
+}
+
+function gitProductId(rootDir: string, { proc, fs, path }: NonNullable<ReturnType<typeof readNodeBuiltins>>): ProductId | undefined {
+  const gitEntry = path.join(rootDir, '.git');
+  try {
+    const info = fs.statSync(gitEntry);
+    if (info.isFile()) return worktreeProductId(rootDir, proc);
+    if (info.isDirectory()) {
+      const config = fs.readFileSync(path.join(gitEntry, 'config'), 'utf8');
+      const { origin, upstream } = parseGitConfigRemoteUrls(config);
+      return productIdFromRepositoryRef(origin) ?? productIdFromRepositoryRef(upstream);
+    }
+  } catch { /* Source metadata is optional. */ }
+  return undefined;
 }
 
 export function resolveNodeProductId(options: {
@@ -144,13 +140,8 @@ export function resolveNodeProductId(options: {
   if (fromGithubRepo) return fromGithubRepo;
 
   if (builtins && rootDir) {
-    for (const configText of readGitConfigTexts(rootDir, builtins.fs, builtins.path)) {
-      const remotes = parseGitConfigRemoteUrls(configText);
-      const fromOrigin = productIdFromRepositoryRef(remotes.origin);
-      if (fromOrigin) return fromOrigin;
-      const fromUpstream = productIdFromRepositoryRef(remotes.upstream);
-      if (fromUpstream) return fromUpstream;
-    }
+    const product = gitProductId(rootDir, builtins);
+    if (product) return product;
   }
 
   return 'openmotion';

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -99,6 +100,9 @@ test('resolveNodeProductId follows strict priority across env, build-info, GITHU
     const worktreeDir = path.join(tempRoot, 'worktree-checkout');
     await mkdir(worktreeMeta, { recursive: true });
     await mkdir(worktreeDir, { recursive: true });
+    await mkdir(path.join(bareCommon, 'objects'));
+    await mkdir(path.join(bareCommon, 'refs'));
+    await writeFile(path.join(worktreeMeta, 'HEAD'), 'ref: refs/heads/feat-branch\n');
     await writeFile(path.join(bareCommon, 'config'), '[remote "origin"]\n\turl = git@github.com:nexu-io/opengame.git\n');
     await writeFile(path.join(worktreeMeta, 'commondir'), '../..\n');
     await writeFile(path.join(worktreeDir, '.git'), `gitdir: ${worktreeMeta}\n`);
@@ -121,6 +125,24 @@ test('resolveNodeProductId follows strict priority across env, build-info, GITHU
     assert.equal(resolveNodeProductId({ rootDir: emptyDir, env: {} }), 'openmotion');
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('a blocked external Git metadata read cannot stall product identity', { skip: process.platform === 'win32' }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'om-blocked-worktree-'));
+  try {
+    const worktree = path.join(root, 'checkout');
+    const gitDir = path.join(root, 'external-git');
+    await mkdir(worktree);
+    await mkdir(gitDir);
+    await writeFile(path.join(worktree, '.git'), `gitdir: ${gitDir}\n`);
+    await writeFile(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main\n');
+    execFileSync('mkfifo', [path.join(gitDir, 'commondir')]);
+    const start = performance.now();
+    assert.equal(resolveNodeProductId({ rootDir: worktree, env: {} }), 'openmotion');
+    assert.ok(performance.now() - start < 2_000, 'Worktree lookup has a bounded fallback');
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 

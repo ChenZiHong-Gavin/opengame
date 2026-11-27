@@ -221,10 +221,12 @@ a new installation.
 Common fields include schema/product/app version, environment, entrypoint/runtime,
 platform/architecture, OS/version, runtime locale, device IANA timezone and UTC offset
 (east of UTC is positive). After OpenDesign's existing GeoIP transformation, the
-[OM-only transformation](./posthog-geoip.hog) matches `product=openmotion`, derives
+[Open* GeoIP transformation](./posthog-geoip.hog) matches every `product` value starting
+with `open` (`openmotion`, `opengame`, and future `open*` products), derives
 country/first-level region/geographic timezone and removes raw IP, precise GeoIP
 and person-location updates before storage. The transformation has both an event
-filter and a source-code guard; non-OM events pass through unchanged. Existing
+filter and a source-code guard (`startsWith(product, 'open')`); events whose `product`
+does not start with `open` pass through unchanged. Existing
 OpenDesign transformations and the project's global IP setting are unchanged.
 Lookup failures leave geographic fields unknown. GeoIP describes the observable
 network egress; VPNs/proxies can change it. Device timezone is a separate setting.
@@ -520,7 +522,9 @@ backend/data directory. Deterministic coverage lives in
   A Cinema template card uses `studio_bar/try_prompt` with its `template_id`, `scene_id` and zero-based `position`.
   Opening a template prepares a draft. Generation submission is counted separately.
 - Model hubs (`page=model-hub`): one `page_view` with `page_name=model_hub`, `hub_id` and `signed_in` once the
-  sign-in state is known; clicks in areas `hub_header`, `hub_hero`, `hub_videos`, `hub_video_detail` and
+  sign-in state is known; when the Black Friday header pill is shown, one `surface_view` (`area=hub_header`,
+  `element=banner`, `hook_id=model_hub_bf_pill`, `campaign_id`, `entry_id`, `hub_id`, `signed_in`) after account
+  resolution completes; clicks in areas `hub_header`, `hub_hero`, `hub_videos`, `hub_video_detail` and
   `hub_availability` carry `hub_id`, `hub_video_id` (catalogue id), `signed_in` and, for scene filters, a
   `filter_value` slug. Video titles, creators, post links and search text are never fields.
 - The template gallery shared with the website (`web/template-gallery.ts`, shown in the
@@ -709,22 +713,36 @@ so `account_sign_in_result` joins 1:1 with the triggering click. URLs and titles
 ### Login & monetization touchpoint attribution (`hook_id` + `entry_id`)
 
 All plugin login and upgrade touchpoints share the closed `entitlementHookIds` enum (`hook_id`) and a per-click UUID
-(`entry_id`):
-- Exposure: `surface_view` (`area=entitlement_gate`, `element=gate_card`, `hook_id`) or `campaign_banner` (`hook_id=bf_banner`).
-- Click: `ui_click` with `hook_id` + `entry_id` across header Pricing (`header_pricing`), Black Friday banner (`bf_banner`),
-  Settings sign-in/subscription (`settings_signin` / `settings_subscription`), Media composer gates (`studio_generate` /
-  `studio_free_gate`), Model Hub (`model_hub_signin` / `model_hub_upgrade`), and Cloud Share (`game_publish_signin` /
-  `cloud_share_signin`). Super Agent's inline sign-in / upgrade cards report under the same Media gate hooks
-  (`studio_generate` / `studio_free_gate`, `page_name=creative_studio`, `studio_id=game`): the in-card login forwards
-  that hook + click `entry_id`, the upgrade anchor opens the attributed pricing page with the same `entry_id`, and a
-  detected upgrade emits `entitlement_refresh_result` before the conversation resumes. The Super Agent publish
-  sign-in card (publish blocked while signed out) reports under the Cloud Share hooks instead (`game_publish_signin`
-  for games, `cloud_share_signin` otherwise, plus `publish_target`) and forwards that hook + click `entry_id` to login.
-- Backend join: `POST /api/settings/account/login` forwards `{ hookId, entryId }` to `account_sign_in_result`;
+(`entry_id`). Studio also attaches global `signed_in` context on Studio events once account resolution completes
+(without overriding explicit caller fields):
+- Exposure: `surface_view` across `area=entitlement_gate` / `element=gate_card` (`hook_id`), `area=entitlement_modal` /
+  `element=modal` (`balance_gate_topup`, `concurrency_gate_upgrade`, `failure_card_topup`), `area=campaign_banner` /
+  `element=banner` (`bf_banner`, `explore_bf_hero`), `area=hub_header` / `element=banner` (`model_hub_bf_pill`), and
+  `area=provider_detail` / `element=gate_card` (Settings balance-low recharge banner). Game publish sign-in gates emit
+  distinct impressions and clicks for the publish panel (`game_publish_panel_signin`), failed publish card
+  (`game_publish_failed_signin`), post-publish share hook (`game_publish_post_signin`), and Telegram link step
+  (`game_publish_telegram_signin`), each with `studio_id=game` and `publish_target=game`.
+- Click: `ui_click` with `hook_id` + `entry_id` across header Pricing (`header_pricing`), header account/subscription
+  entries (`open_account`, `open_subscription`, `open_browser_signin`), Black Friday banner & Explore hero
+  (`bf_banner`, `explore_bf_hero`), Model Hub header pill and cards (`model_hub_bf_pill`, `model_hub_signin`,
+  `model_hub_upgrade`), Settings sign-in/subscription/provider links (`settings_signin`, `settings_subscription`,
+  `get_api_key`, `open_browser_signin`), Media & Sound composer gates (`studio_generate`, `studio_free_gate`,
+  `connect_provider`), and Cloud Share / Game Publish (`game_publish_signin`, `game_publish_panel_signin`,
+  `game_publish_failed_signin`, `game_publish_post_signin`, `game_publish_telegram_signin`,
+  `game_publish_unlisted_upgrade`, `cloud_share_signin`, `open_account_settings`). Super Agent's inline sign-in /
+  upgrade cards report under the same Media gate hooks (`studio_generate` / `studio_free_gate`,
+  `page_name=creative_studio`, `studio_id=game`): the in-card login forwards that hook + click `entry_id`, the upgrade
+  anchor opens the attributed pricing page with the same `entry_id`, and a detected upgrade emits
+  `entitlement_refresh_result` before the conversation resumes. The Super Agent publish sign-in card (publish blocked
+  while signed out) reports under the Cloud Share hooks instead (`game_publish_signin` for games, `cloud_share_signin`
+  otherwise, plus `publish_target`) and forwards that hook + click `entry_id` to login.
+- Backend join: `POST /api/settings/account/login` forwards `{ hookId, entryId }` to `account_sign_in_result` and passes
+  `VELA_LOGIN_SOURCE_PRODUCT`, `VELA_LOGIN_ENTRY_ID`, `VELA_LOGIN_SOURCE_DETAIL`, and `VELA_LOGIN_ENTRY_OCCURRED_AT`
+  into the `vela login` connector process so AMR attributes browser activation to the originating touchpoint;
   `POST /api/settings/account/subscription` forwards `entryId` into `od_entry_id` (prefixed with `opengame-` in
   OpenGame builds) while preserving the AMR-registered `od_entry_source=openmotion_manage_subscription`.
 - Return refresh: returning to the window after checkout emits `entitlement_refresh_result` (`hook_id`, `entry_id`,
-  `outcome`, `plan_changed`).
+  `outcome`, `plan_changed`) through the shared `refreshEntitlementAfterCheckout` helper.
 
 ## Template detail handoff coverage
 

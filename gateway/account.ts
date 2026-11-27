@@ -774,7 +774,7 @@ export class OpenDesignAccount {
       this.errorCode = error instanceof SignInFailure ? error.code : failureCode(this.attempt!, false);
       this.connectorProblem = error instanceof SignInFailure ? error.connector?.problem : undefined;
       // The message offers the manual command only when the summary shows one.
-      this.error = !this.connectorProblem ? failureMessages[this.errorCode] : this.explicitBinary() ? explicitConnectorMessage : connectorMessages[this.connectorProblem];
+      this.error = !this.connectorProblem ? failureMessages[this.errorCode] : this.explicitBinary() ? explicitConnectorMessage : (error instanceof SignInFailure && error.connector?.advice) || connectorMessages[this.connectorProblem];
       this.finish(this.attempt!, 'failure', this.errorCode, undefined, error instanceof SignInFailure ? error.connector : undefined);
     });
     return this.summary();

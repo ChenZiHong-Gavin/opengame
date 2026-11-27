@@ -34,6 +34,7 @@ import { createReadStream } from 'node:fs';
 import { access, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { diagnoseFailedRender, exportLintErrors } from './shared/export-lint-diagnostics.ts';
 import { WorkspaceStore, Conflict, createBlankProject, validateProjectTitle, interruptedExport, trackExportResult } from './workspace.ts';
 import type { ExportJob } from './workspace.ts';
 import { cliPath, ensureRuntime, execute, HYPERFRAMES_VERSION, inspectProject, pluginRoot, runHyperframes, startStudio, stopCommands } from './hyperframes.ts';
@@ -167,6 +168,7 @@ export async function renderNext(store: WorkspaceStore, runtimeRoot: string, tra
   working.add(key);
   let job;
   let control: AbortController | undefined;
+  let lintFindings: ExportJob['lintFindings'];
   let failure: ExportFailure = { failureStage: 'lint', failureCode: 'EXPORT_LINT_FAILED' };
   try {
     // A queued job whose deadline passed, or a claimed job whose worker vanished, is closed before claiming.
@@ -194,6 +196,7 @@ export async function renderNext(store: WorkspaceStore, runtimeRoot: string, tra
     const lint = await inspectProject(runtimeRoot, directory, 'lint', control.signal);
     if (lint.exitCode) {
       const findings = lint.result?.findings?.filter((entry: { severity: string }) => entry.severity === 'error');
+      if (job.phase1 && findings) lintFindings = exportLintErrors(directory, findings);
       const finding = findings?.[0];
       if (findings) failure.ruleCount = findings.length;
       if (typeof finding?.code === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(finding.code)) failure.checkCode = finding.code;
@@ -212,6 +215,9 @@ export async function renderNext(store: WorkspaceStore, runtimeRoot: string, tra
       if (result.signal) failure.terminalSignal = (['SIGKILL', 'SIGTERM', 'SIGINT', 'SIGABRT', 'SIGSEGV'] as const).find(signal => signal === result.signal) ?? 'other';
       else failure.rendererExitCode = result.code;
       failure.renderReason = result.signal ? 'process_signalled' : classifyRenderFailure(result.stderr + '\n' + result.stdout);
+      if (job.phase1 && !control.signal.aborted) {
+        lintFindings = await diagnoseFailedRender(runtimeRoot, directory, job.compositionPath ?? 'index.html', control.signal).catch(() => undefined);
+      }
       throw new Error('Hyperframes render 失败：' + (result.stderr || result.stdout).slice(-1800));
     }
     // Never label an absent or non-MP4 output as completed, even after exit code 0.
@@ -250,7 +256,7 @@ export async function renderNext(store: WorkspaceStore, runtimeRoot: string, tra
     const current = await store.job(job.id);
     if (current && ['running', 'cancelling'].includes(current.state)) {
       try {
-        const finished = await store.finishExport(job.id, job.token!, error instanceof Error ? error.message : '渲染失败', failure);
+        const finished = await store.finishExport(job.id, job.token!, error instanceof Error ? error.message : '渲染失败', { ...failure, ...(lintFindings && { lintFindings }) });
         if (finished.state === 'cancelled' && failure.failureStage === 'finalize') await rm(store.exportPath(job), { force: true }).catch(() => {});
       }
       catch (persistError) {

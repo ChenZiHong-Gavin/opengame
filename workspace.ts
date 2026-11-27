@@ -40,7 +40,7 @@ export type SavedProject = { id: string; title: string; titleKey?: 'OpenMotion S
 export type ProjectCatalog = { activeId: string; projects: SavedProject[]; sessions?: CreativeSession[]; activeSessionId?: string };
 export type ProjectMutationResult = { projectId: string; title: string; trashed?: boolean; deleted?: boolean; activeProjectId: string; replayed?: boolean };
 type ProjectTrashIntent = { action: 'trash' | 'restore'; projectId: string; requestId: string };
-export type ExportJob = Partial<ExportFailure> & { id: string; projectId?: string; versionId?: string; requestId?: string; workId?: string; phase1?: boolean; compositionPath?: string; stage?: string; verification?: unknown; trackingHost?: HostContext; revision: string; state: 'pending' | 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed';
+export type ExportJob = Partial<ExportFailure> & { id: string; projectId?: string; versionId?: string; requestId?: string; workId?: string; phase1?: boolean; compositionPath?: string; stage?: string; verification?: unknown; lintFindings?: import('./shared/export-lint-diagnostics.ts').ExportLintFinding[]; trackingHost?: HostContext; revision: string; state: 'pending' | 'running' | 'cancelling' | 'cancelled' | 'completed' | 'failed';
   createdAt: number; claimedAt?: number; stageStartedAt?: number; acceptedAt?: number; deadlineAt?: number; terminalAt?: number; observedOutcome?: 'success' | 'failure' | 'unknown' | 'cancelled'; expiresAt: number; token?: string; workerPid?: number; file?: string; outputName?: string; error?: string; expected?: ExportExpectation };
 export class Conflict extends Error { readonly code = 'VERSION_CONFLICT'; constructor() { super('工程已经被 Studio 或 Agent 更新，请重新读取 revision 后再修改。'); } }
 
@@ -664,7 +664,7 @@ export class WorkspaceStore {
       await this.saveJob(job); return job;
     });
   }
-  async finishExport(id: string, token: string, error?: string, failure?: ExportFailure) {
+  async finishExport(id: string, token: string, error?: string, failure?: ExportFailure & Pick<ExportJob, 'lintFindings'>) {
     return this.lock(async () => {
       const job = await this.job(id) ?? await this.job();
       if (!job || job.id !== id || job.token !== token || !['running', 'cancelling'].includes(job.state)) throw new Error('无效的导出任务凭据');

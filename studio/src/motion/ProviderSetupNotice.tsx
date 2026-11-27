@@ -43,7 +43,7 @@ export function GenerationUpgradeNotice({ destination, onError, onUpgrade, visit
     },
     onError,
     checkout => {
-      void refreshEntitlementAfterCheckout('creative_studio', checkout.hookId, checkout.entryId, prevPlanRef.current, onError);
+      void refreshEntitlementAfterCheckout('creative_studio', checkout.hookId, checkout.entryId, prevPlanRef.current, onError, checkout);
     },
   );
   const trackedSubscription = {

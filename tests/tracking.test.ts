@@ -28,6 +28,21 @@ function packet(): PendingEvent {
 const core = (send: Parameters<typeof createTracker>[0]['send'], maxQueue = 64) =>
   createTracker({ registry: omEvents, entrypoint: 'mcp', enabled: true, flushIntervalMs: 0, maxQueue, send });
 
+async function withTelemetryEnvUnlocked<T>(fn: () => Promise<T>): Promise<T> {
+  const prevTelemetry = process.env.OPENMOTION_TELEMETRY;
+  const prevDnt = process.env.DO_NOT_TRACK;
+  delete process.env.OPENMOTION_TELEMETRY;
+  delete process.env.DO_NOT_TRACK;
+  try {
+    return await fn();
+  } finally {
+    if (prevTelemetry === undefined) delete process.env.OPENMOTION_TELEMETRY;
+    else process.env.OPENMOTION_TELEMETRY = prevTelemetry;
+    if (prevDnt === undefined) delete process.env.DO_NOT_TRACK;
+    else process.env.DO_NOT_TRACK = prevDnt;
+  }
+}
+
 test('Studio event types reject Node-only events and invalid semantic fields', () => {
   execFileSync(process.execPath, [path.join(pluginRoot, 'node_modules/typescript/bin/tsc'),
     '--noEmit', '--strict', '--allowImportingTsExtensions', '--module', 'ESNext', '--moduleResolution', 'Bundler',
@@ -637,9 +652,10 @@ test('provider setup handoff tracks MCP entries exclusively without counting Web
   }
 }));
 
-test('upgrade links track one result per stdio MCP inspect, excluding WebMCP and HTTP calls', t => fixture(async store => {
+test('upgrade links track one result per stdio and HTTP MCP inspect, excluding WebMCP calls', t => withTelemetryEnvUnlocked(() => fixture(async store => {
   const { rpc } = await import('../mcp.ts');
   const { gatewayFor } = await import('../gateway/service.ts');
+  const { decodeMonetizationShortlink, PRODUCT_ID } = await import('../shared/product-identity.ts');
   const events: PendingEvent[] = [];
   const tracking = core(async batch => { events.push(...batch); return 'accepted'; });
   store.tracking = tracking;
@@ -658,13 +674,25 @@ test('upgrade links track one result per stdio MCP inspect, excluding WebMCP and
   const upgradeEvents = () => events.filter(event => event.event === 'upgrade_link_result');
   const fetcher = t.mock.fn(async () => { throw new Error('Must not request account intents'); });
   gateway.account.options.fetcher = fetcher;
-  const checkUpgrade = (upgrade: { url: string; entryId: string }) => {
-    const params = new URL(upgrade.url).searchParams;
-    assert.match(params.get('od_entry_id')!, /^opengame-/);
-    assert.equal(params.get('od_entry_id')!.slice('opengame-'.length), upgrade.entryId);
-    assert.equal(params.get('utm_source'), 'opengame');
-    assert.equal(params.get('utm_medium'), 'agent');
-    assert.equal(params.has('intentId'), false);
+  const checkUpgrade = (upgrade: { url: string; entryId: string }, expected: { channel: 'mcp_stdio' | 'mcp_http'; host: string; touchpoint: string }) => {
+    const parsed = new URL(upgrade.url);
+    assert.equal(parsed.origin, 'https://open-design.ai');
+    assert.match(parsed.pathname, /^\/t\/[A-Za-z0-9_-]+$/);
+    assert.equal(parsed.search, '');
+    const decoded = decodeMonetizationShortlink(upgrade.url);
+    assert.deepEqual(decoded, {
+      version: 'v1',
+      target: 'd',
+      entryId: upgrade.entryId,
+      product: PRODUCT_ID,
+      channel: expected.channel,
+      host: expected.host,
+      touchpoint: expected.touchpoint,
+      studioId: 'unknown',
+      modality: 'all',
+      placementId: `${expected.channel}__${expected.host}__unknown__all`,
+      destinationUrl: 'https://open-design.ai/cloud/dashboard?billing=plan',
+    });
     assert.equal(fetcher.mock.callCount(), 0);
   };
   try {
@@ -674,27 +702,47 @@ test('upgrade links track one result per stdio MCP inspect, excluding WebMCP and
       const before = upgradeEvents().length;
       const web: any = await callPhase1({ name: 'openmotion_media_use', arguments: { action: 'inspect' } });
       assert.ok(web.upgrade);
-      checkUpgrade(web.upgrade);
+      checkUpgrade(web.upgrade, { channel: 'mcp_stdio', host: 'unknown', touchpoint: `agent_media_upgrade_${tier}` });
       assert.equal(Object.hasOwn(web, '_upgradeLinkResult'), false);
+      await tracking.flush();
+      assert.equal(upgradeEvents().length, before);
+
       const remote = await http('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
         jsonrpc: '2.0', id: tier, method: 'tools/call', params: { name: 'openmotion_media_use', arguments: { action: 'inspect' } },
       }) });
       assert.equal(remote.status, 200);
       const remoteResult: any = await remote.json();
       assert.ok(remoteResult.result.structuredContent.upgrade);
+      checkUpgrade(remoteResult.result.structuredContent.upgrade, { channel: 'mcp_http', host: 'codex', touchpoint: `agent_media_upgrade_${tier}` });
       assert.equal(Object.hasOwn(remoteResult.result.structuredContent, '_upgradeLinkResult'), false);
       assert.doesNotMatch(remoteResult.result.content[0].text, /_upgradeLinkResult/);
       await tracking.flush();
-      assert.equal(upgradeEvents().length, before);
+      assert.equal(upgradeEvents().length, before + 1);
+      assert.deepEqual(upgradeEvents().at(-1)!.properties, {
+        entry_from: `agent_media_upgrade_${tier}`,
+        outcome: 'success',
+        entry_id: remoteResult.result.structuredContent.upgrade.entryId,
+        channel: 'mcp_http',
+        studio_id: 'unknown',
+        modality: 'all',
+      });
+
       const result: any = await inspect(tier);
       assert.ok(result.result.structuredContent.upgrade);
-      checkUpgrade(result.result.structuredContent.upgrade);
+      checkUpgrade(result.result.structuredContent.upgrade, { channel: 'mcp_stdio', host: 'codex', touchpoint: `agent_media_upgrade_${tier}` });
       assert.equal(Object.hasOwn(result.result.structuredContent, '_upgradeLinkResult'), false);
       assert.doesNotMatch(result.result.content[0].text, /_upgradeLinkResult/);
       await tracking.flush();
-      assert.equal(upgradeEvents().length, before + 1);
+      assert.equal(upgradeEvents().length, before + 2);
       const event = upgradeEvents().at(-1)!;
-      assert.deepEqual(event.properties, { entry_from: `agent_media_upgrade_${tier}`, outcome: 'success', entry_id: result.result.structuredContent.upgrade.entryId });
+      assert.deepEqual(event.properties, {
+        entry_from: `agent_media_upgrade_${tier}`,
+        outcome: 'success',
+        entry_id: result.result.structuredContent.upgrade.entryId,
+        channel: 'mcp_stdio',
+        studio_id: 'unknown',
+        modality: 'all',
+      });
       assert.equal(event.host_context?.host_agent, 'codex');
     }
     for (const action of ['providers', 'list']) {
@@ -703,12 +751,13 @@ test('upgrade links track one result per stdio MCP inspect, excluding WebMCP and
       const discovered: any = await rpc({ jsonrpc: '2.0', id: `discover-${action}`, method: 'tools/call',
         params: { name: 'openmotion_capability_discover', arguments: { action } } }, store, undefined, undefined, undefined, { callPhase1 });
       assert.ok(discovered.result.structuredContent.upgrade, action);
-      checkUpgrade(discovered.result.structuredContent.upgrade);
+      checkUpgrade(discovered.result.structuredContent.upgrade, { channel: 'mcp_stdio', host: 'codex', touchpoint: 'agent_media_upgrade_free' });
       assert.equal(Object.hasOwn(discovered.result.structuredContent, '_upgradeLinkResult'), false, action);
       assert.doesNotMatch(discovered.result.content[0].text, /_upgradeLinkResult/, action);
       await tracking.flush();
       assert.equal(upgradeEvents().length, before + 1, action);
       assert.equal(upgradeEvents().at(-1)!.properties.entry_id, discovered.result.structuredContent.upgrade.entryId, action);
+      assert.equal(upgradeEvents().at(-1)!.properties.channel, 'mcp_stdio', action);
     }
     const counted = upgradeEvents().length;
     plan = 'plus';
@@ -731,10 +780,17 @@ test('upgrade links track one result per stdio MCP inspect, excluding WebMCP and
     assert.deepEqual(failed.result.structuredContent.settingsHandoff.arguments, { target: 'providers', entry: 'agent_media_upgrade_go' });
     await tracking.flush();
     assert.equal(upgradeEvents().length, counted + 1);
-    assert.deepEqual(upgradeEvents()[counted].properties, { entry_from: 'agent_media_upgrade_go', outcome: 'failure' });
+    assert.deepEqual(upgradeEvents()[counted].properties, {
+      entry_from: 'agent_media_upgrade_go',
+      outcome: 'failure',
+      channel: 'mcp_stdio',
+      studio_id: 'unknown',
+      modality: 'all',
+    });
     assert.equal(Object.hasOwn(studioEvents, 'upgrade_link_result'), false);
     assert.deepEqual(omEvents.upgrade_link_result.producers, ['mcp']);
-    assert.equal(validProperties(omEvents, 'upgrade_link_result', { entry_from: 'agent_media_upgrade_free', outcome: 'success', entry_id: crypto.randomUUID() }), true);
+    assert.equal(validProperties(omEvents, 'upgrade_link_result', { entry_from: 'agent_media_upgrade_free', outcome: 'success', entry_id: crypto.randomUUID(), channel: 'mcp_stdio', studio_id: 'unknown', modality: 'all' }), true);
+    assert.equal(validProperties(omEvents, 'upgrade_link_result', { entry_from: 'agent_media_balance_low', outcome: 'success', entry_id: crypto.randomUUID(), channel: 'mcp_http', studio_id: 'motion', modality: 'video' }), true);
     for (const properties of [
       { entry_from: 'agent_media_signed_out', outcome: 'failure' },
       { entry_from: 'agent_media_upgrade_free', outcome: 'failure', entry_id: 'private-id' },
@@ -746,13 +802,14 @@ test('upgrade links track one result per stdio MCP inspect, excluding WebMCP and
     await gateway.close();
     tracking.close();
   }
-}));
+})));
 
 for (const plan of ['free', 'go'] as const) {
-  test(`${plan} provider discovery strips upgrade metadata on every transport and tracks exactly once on stdio`, t => fixture(async store => {
+  test(`${plan} provider discovery strips upgrade metadata on every transport and tracks once per MCP call`, t => withTelemetryEnvUnlocked(() => fixture(async store => {
     const { rpc } = await import('../mcp.ts');
     const { gatewayFor } = await import('../gateway/service.ts');
     const { buildOpenMotionWebMcpTools } = await import('../shared/webmcp-tools.ts');
+    const { decodeMonetizationShortlink, PRODUCT_ID } = await import('../shared/product-identity.ts');
     const events: PendingEvent[] = [];
     const tracking = core(async batch => { events.push(...batch); return 'accepted'; });
     store.tracking = tracking;
@@ -766,44 +823,64 @@ for (const plan of ['free', 'go'] as const) {
       assert.equal(response.status, 200);
       return response.json();
     };
-    const visibleUpgrade = (value: any) => {
+    const visibleUpgrade = (value: any, expectedChannel: 'mcp_stdio' | 'mcp_http') => {
       assert.ok(value.upgrade);
       assert.equal(value.upgrade.plan, 'plus');
-      // OpenGame links prefix od_entry_id with opengame-; the raw UUID stays the event entry_id.
-      assert.equal(new URL(value.upgrade.url).searchParams.get('od_entry_id'), `opengame-${value.upgrade.entryId}`);
+      const decoded = decodeMonetizationShortlink(value.upgrade.url);
+      assert.ok(decoded);
+      assert.equal(decoded.entryId, value.upgrade.entryId);
+      assert.equal(decoded.product, PRODUCT_ID);
+      assert.equal(decoded.channel, expectedChannel);
+      assert.equal(decoded.touchpoint, `agent_media_upgrade_${plan}`);
       assert.equal(Object.hasOwn(value, '_upgradeLinkResult'), false);
     };
     const upgradeEvents = () => events.filter(event => event.event === 'upgrade_link_result');
     try {
-      visibleUpgrade(await callPhase1(payload));
+      visibleUpgrade(await callPhase1(payload), 'mcp_stdio');
       const webTool = buildOpenMotionWebMcpTools(http).find(tool => tool.name === payload.name)!;
-      visibleUpgrade(await webTool.execute(payload.arguments));
+      visibleUpgrade(await webTool.execute(payload.arguments), 'mcp_stdio');
+      await tracking.flush();
+      assert.equal(upgradeEvents().length, 0);
+
       const remote = await http('/mcp', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
         jsonrpc: '2.0', id: plan, method: 'tools/call', params: payload,
       }) });
       assert.equal(remote.status, 200);
       const remoteResult: any = await remote.json();
-      visibleUpgrade(remoteResult.result.structuredContent);
+      visibleUpgrade(remoteResult.result.structuredContent, 'mcp_http');
       assert.doesNotMatch(remoteResult.result.content[0].text, /_upgradeLinkResult/);
       await tracking.flush();
-      assert.equal(upgradeEvents().length, 0);
+      assert.equal(upgradeEvents().length, 1);
+      assert.deepEqual(upgradeEvents()[0].properties, {
+        entry_from: `agent_media_upgrade_${plan}`,
+        outcome: 'success',
+        entry_id: remoteResult.result.structuredContent.upgrade.entryId,
+        channel: 'mcp_http',
+        studio_id: 'unknown',
+        modality: 'all',
+      });
 
       await rpc({ jsonrpc: '2.0', id: 'init', method: 'initialize', params: { clientInfo: { name: 'codex-mcp-client', version: '1.2.3' } } }, store);
       const result: any = await rpc({ jsonrpc: '2.0', id: plan, method: 'tools/call', params: payload }, store,
         undefined, undefined, undefined, { callPhase1 });
-      visibleUpgrade(result.result.structuredContent);
+      visibleUpgrade(result.result.structuredContent, 'mcp_stdio');
       assert.deepEqual(JSON.parse(result.result.content[0].text), result.result.structuredContent);
       await tracking.flush();
-      assert.equal(upgradeEvents().length, 1);
-      assert.deepEqual(upgradeEvents()[0].properties, {
-        entry_from: `agent_media_upgrade_${plan}`, outcome: 'success', entry_id: result.result.structuredContent.upgrade.entryId,
+      assert.equal(upgradeEvents().length, 2);
+      assert.deepEqual(upgradeEvents()[1].properties, {
+        entry_from: `agent_media_upgrade_${plan}`,
+        outcome: 'success',
+        entry_id: result.result.structuredContent.upgrade.entryId,
+        channel: 'mcp_stdio',
+        studio_id: 'unknown',
+        modality: 'all',
       });
-      assert.equal(upgradeEvents()[0].host_context?.host_agent, 'codex');
+      assert.equal(upgradeEvents()[1].host_context?.host_agent, 'codex');
     } finally {
       await gateway.close();
       tracking.close();
     }
-  }));
+  })));
 }
 
 test('template handoff admits observed results and rejects content, made-up outcomes and invalid identities', () => {

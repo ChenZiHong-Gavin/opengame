@@ -2685,7 +2685,7 @@ function GateActionCard({
         <a
           className="om-sa-deliverable-btn om-sa-action-card-btn"
           data-primary
-          href={campaignPricingUrl(locale, 'opengame_agent_upgrade', entryId)}
+          href={campaignPricingUrl(locale, 'opengame_agent_upgrade', entryId, { studioId: 'game', modality: 'all' })}
           target="_blank"
           rel="noopener noreferrer"
           aria-describedby={descriptionId}

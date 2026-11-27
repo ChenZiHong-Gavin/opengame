@@ -13,6 +13,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { browserExecutable, browserAutomation } from './browser.ts';
 import type { Page, Browser, KeyInput } from 'puppeteer-core';
 import { assetHttp } from './gateway/asset-http.ts';
+import { buildMediaSettingsHandoff } from './gateway/media-use.ts';
 import { buildPublishBundle } from './gateway/web-publish-bundle.ts';
 import { WorkspaceStore } from './workspace.ts';
 import { ensureRuntime, execute, pluginRoot, HYPERFRAMES_VERSION } from './hyperframes.ts';
@@ -1892,7 +1893,21 @@ export async function dispatchGameTool(name: string, args: any, workspace: strin
     case 'set_status':
       if (args.status === 'building') assertSinglePlayerAuthoring((await service.get(args.id)).multiplayer);
       return service.status(args.id,args.status);
-    case 'publish': return service.publish(args.id);
+    case 'publish': {
+      try {
+        return await service.publish(args.id);
+      } catch (error) {
+        const raw = error instanceof Error ? error.message : String(error);
+        if (raw.startsWith('OPENDESIGN_SIGN_IN_REQUIRED') || (error as { code?: unknown })?.code === 'OPENDESIGN_SIGN_IN_REQUIRED') {
+          throw Object.assign(error instanceof Error ? error : new Error(raw), {
+            code: 'OPENDESIGN_SIGN_IN_REQUIRED',
+            applied: false,
+            settingsHandoff: buildMediaSettingsHandoff('agent_game_publish_signed_out'),
+          });
+        }
+        throw error;
+      }
+    }
     case 'wechat': return (await import('./gateway/wechat-minigame.ts')).wechatMinigameFor(workspace).action(args);
     default: throw new GameError('Unknown game tool');
   }

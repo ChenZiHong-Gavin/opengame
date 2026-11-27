@@ -25,6 +25,7 @@ import { Phase1Service } from '../phase1.ts';
 import { pluginRoot } from '../hyperframes.ts';
 import type { Fetcher } from '../gateway/network.ts';
 import { providerRegistry, mediaProviders, registeredProvider } from '../shared/provider-registry.ts';
+import { attributedEntryId, currentProductId, PRODUCT_ID } from '../shared/product-identity.ts';
 import { providerAdapters } from '../gateway/providers.ts';
 import { transport } from './http.ts';
 import { callTool } from '../mcp.ts';
@@ -602,7 +603,8 @@ test('completed sign-in delivers its source through the shared sender and respec
   assert.equal(batch.length, 1); assert.equal(batch[0].event, 'account_sign_in_result');
   const fields = batch[0].properties;
   assert.equal(fields.outcome, 'success'); assert.equal(fields.product, 'openmotion');
-  assert.equal(fields.source_product, 'opengame'); assert.equal(fields.source_detail, 'opengame_editor_login');
+  const product = currentProductId();
+  assert.equal(fields.source_product, product); assert.equal(fields.source_detail, `${product}_editor_login`);
   assert.equal(fields.amr_user_id, 'fixture-user-id');
   assert.equal(fields.installation_id, installationId); assert.equal(fields.distinct_id, installationId); assert.equal(fields.utm_source, 'creator');
   assert.notEqual(fields.entry_id, fields.attempt_id);
@@ -640,7 +642,7 @@ test('finished sign-in reports the confirmed account only on success, without cr
   const [success, cancelled, failure] = records;
   const { attempt_id: _id, entry_id, entry_occurred_at, duration_ms, prepare_ms, link_ms, approved_ms, ...fixed } = success;
   assert.deepEqual(fixed, { outcome: 'success', connector_version: '0.1.10', resumed: false, last_stage: 'credential_persist_result', last_result: 'success',
-    source_product: 'opengame', source_detail: 'opengame_editor_login', amr_user_id: 'fixture-user-id',
+    source_product: currentProductId(), source_detail: `${currentProductId()}_editor_login`, amr_user_id: 'fixture-user-id',
     browser_opened: true, receipt: 'accepted', exit_code: 0 });
   assert.match(entry_id!, /^[0-9a-f-]{36}$/); assert.notEqual(entry_id, success.attempt_id);
   assert.equal(new Date(entry_occurred_at!).toISOString(), entry_occurred_at);
@@ -682,14 +684,15 @@ test('sign-in injects OpenGame attribution env vars into vela login and clears i
   await until(async () => Boolean((await account.summary()).authorizationUrl));
   await writeFile(path.join(account.home, 'authorize'), 'yes');
   await until(async () => (await account.summary()).state === 'signed-in');
-  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ORIGIN, 'opengame');
-  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ENTRY_ID, `opengame-${entryId}`);
+  const product = currentProductId();
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ORIGIN, product);
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ENTRY_ID, attributedEntryId(entryId));
   assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_ENTRY_SOURCE, 'header_signin');
   assert.match(String(spawnedEnv?.OPEN_DESIGN_AMR_ENTRY_AT), /^\d{4}-\d{2}-\d{2}T/);
-  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_PLACEMENT_ID, 'gui__web__unknown__all');
+  assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_PLACEMENT_ID, 'gui__studio__unknown__all');
   assert.equal(spawnedEnv?.OPEN_DESIGN_AMR_CAMPAIGN_ID, undefined);
   assert.equal(records.length, 1);
-  assert.equal(records[0].source_product, 'opengame');
+  assert.equal(records[0].source_product, product);
   assert.equal(records[0].source_detail, 'header_signin');
   assert.equal(records[0].hook_id, 'header_signin');
   assert.equal(records[0].entry_id, entryId);
@@ -799,23 +802,31 @@ test('the subscription page opens in the system browser through a one-time accou
   assert.deepEqual(opened, ['https://open-design.ai/cloud/login?intentId=intent_1-a']);
   const target = new URL(targets[0], 'https://open-design.ai'), params = target.searchParams;
   assert.equal(target.pathname, '/dashboard');
-  assert.deepEqual([...params.keys()].sort(), ['billing', 'od_entry_at', 'od_entry_id', 'od_entry_source', 'od_origin']);
-  assert.equal(params.get('billing'), 'plan'); assert.equal(params.get('od_origin'), 'openmotion');
-  assert.equal(params.get('od_entry_source'), 'openmotion_manage_subscription');
-  assert.match(params.get('od_entry_id')!, /^opengame-[0-9a-f-]{36}$/); assert.equal(new Date(params.get('od_entry_at')!).toISOString(), params.get('od_entry_at'));
+  assert.deepEqual([...params.keys()].sort(), ['billing', 'od_entry_at', 'od_entry_id', 'od_entry_source', 'od_origin', 'od_placement_id']);
+  assert.equal(params.get('billing'), 'plan'); assert.equal(params.get('od_origin'), PRODUCT_ID);
+  assert.equal(params.get('od_entry_source'), 'settings_subscription');
+  assert.equal(params.get('od_placement_id'), 'gui__studio__settings__all');
+  const entryIdPattern = PRODUCT_ID === 'opengame' ? /^opengame-[0-9a-f-]{36}$/ : /^[0-9a-f-]{36}$/;
+  assert.match(params.get('od_entry_id')!, entryIdPattern); assert.equal(new Date(params.get('od_entry_at')!).toISOString(), params.get('od_entry_at'));
   // Each open carries a fresh entry; a refused or malformed intent still opens the plain page.
   for (const refusal of [() => Response.json({ error: 'unauthorized' }, { status: 401 }), () => Response.json({ intentId: '../evil' }), () => { throw new TypeError('offline'); }]) {
     response = refusal;
     const result = await account.openSubscription(launch);
     assert.equal(new URL(result.url).origin + new URL(result.url).pathname, 'https://open-design.ai/cloud/dashboard');
-    assert.equal(new URL(result.url).searchParams.get('od_origin'), 'openmotion'); assert.equal(result.opened, true);
+    assert.equal(new URL(result.url).searchParams.get('od_origin'), PRODUCT_ID);
+    assert.equal(new URL(result.url).searchParams.get('od_entry_source'), 'settings_subscription');
+    assert.equal(new URL(result.url).searchParams.get('od_placement_id'), 'gui__studio__settings__all');
+    assert.equal(result.opened, true);
   }
   assert.equal(new Set(targets.map(value => new URL(value, 'https://x.test').searchParams.get('od_entry_id'))).size, targets.length);
   const entryId = randomUUID();
-  const attributed = await account.openSubscription(launch, { entryId });
-  assert.equal(new URL(attributed.url).searchParams.get('od_entry_id'), `opengame-${entryId}`);
+  const attributed = await account.openSubscription(launch, { hookId: 'studio_free_gate', entryId, studioId: 'design', modality: 'video' });
+  assert.equal(new URL(attributed.url).searchParams.get('od_entry_id'), attributedEntryId(entryId));
+  assert.equal(new URL(attributed.url).searchParams.get('od_entry_source'), 'studio_free_gate');
+  assert.equal(new URL(attributed.url).searchParams.get('od_placement_id'), 'gui__studio__design__video');
   assert.equal(new URL(attributed.url).searchParams.has('utm_source'), false);
-  assert.equal(new URL(targets.at(-1)!, 'https://x.test').searchParams.get('od_entry_id'), `opengame-${entryId}`);
+  assert.equal(new URL(targets.at(-1)!, 'https://x.test').searchParams.get('od_entry_id'), attributedEntryId(entryId));
+  assert.equal(new URL(targets.at(-1)!, 'https://x.test').searchParams.get('od_placement_id'), 'gui__studio__design__video');
   // A launcher failure hands the link back to Studio.
   response = () => Response.json({ intentId: 'intent-2' });
   assert.deepEqual(await account.openSubscription(async () => { throw new Error('no browser'); }), { url: 'https://open-design.ai/cloud/login?intentId=intent-2', opened: false });

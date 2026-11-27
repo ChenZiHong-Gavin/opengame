@@ -110,7 +110,15 @@ export function previewTrackingContext(value: any, origin: string, token: string
     if (['previewUrl', 'sessionUrl', 'embeddedPreviewUrl', 'url'].includes(key) && typeof child === 'string') {
       try {
         const url = new URL(child);
-        if (url.origin === origin && (url.pathname === '/' || url.pathname.startsWith('/sessions/'))) {
+        if (
+          url.origin === origin
+          && (
+            url.pathname === '/'
+            || url.pathname.startsWith('/sessions/')
+            || url.pathname === '/settings'
+            || url.pathname.startsWith('/settings/')
+          )
+        ) {
           url.searchParams.set('tracking_context', token); return [key, url.href];
         }
       } catch { /* Other handoff values are not URLs. */ }

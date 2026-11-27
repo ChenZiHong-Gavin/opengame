@@ -354,6 +354,8 @@ export class ModelGateway {
     const previousFailurePhase = details.previousFailurePhase ?? (job.attemptKind && job.attemptKind !== 'initial' ? job.lastFailurePhase : undefined);
     if (errorCode) job.lastErrorCode = errorCode;
     if (failurePhase) job.lastFailurePhase = failurePhase;
+    if (job.state === 'failed' && errorCode) job.errorCode = errorCode;
+    else delete job.errorCode;
     await this.saveJob(job);
     const totalOutputBytes = details.totalOutputBytes !== undefined
       ? details.totalOutputBytes
@@ -705,7 +707,7 @@ export class ModelGateway {
       job.state = 'queued'; job.phase = 'resuming'; job.attemptKind = 'resume';
       job.attemptCount = (job.attemptCount ?? 1) + 1; job.attemptId = randomUUID(); job.attemptCreatedAt = now;
       delete job.startedAt; delete job.workerPid;
-      job.updatedAt = now; delete job.error;
+      job.updatedAt = now; delete job.error; delete job.errorCode;
       await this.saveJob(job);
       const retryFields = generationTrackingFields(job);
       recordMediaGenerationRetryStarted(this.options.tracking, {
@@ -830,7 +832,7 @@ export class ModelGateway {
       job.savePending = true; job.state = 'queued'; job.phase = 'saving'; job.attemptKind = 'retry_save';
       job.attemptCount = (job.attemptCount ?? 1) + 1; job.attemptId = randomUUID(); job.attemptCreatedAt = now;
       delete job.startedAt; delete job.workerPid;
-      job.updatedAt = now; delete job.error;
+      job.updatedAt = now; delete job.error; delete job.errorCode;
       await this.saveJob(job);
       const retryFields = generationTrackingFields(job);
       recordMediaGenerationRetryStarted(this.options.tracking, {

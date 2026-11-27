@@ -10,7 +10,7 @@ import { isFontFilePath, prepareImportedFont } from './shared/import-font.ts';
 import { publicToolName, legacyToolName, publicToolResult } from './shared/public-names.mjs';
 import { requireNativeRuntime } from './scripts/npm-runtime.mjs';
 import { recordDiagnostic } from './scripts/diagnostics.mjs';
-import { mediaUse } from './gateway/media-use.ts';
+import { mediaUse, type McpChannel } from './gateway/media-use.ts';
 import { assetOperation } from './gateway/asset-operations.ts';
 import { assetManage, capabilityDiscover, capabilityRun, jobManage } from './gateway/capability-center.ts';
 import { transcriptOperation } from './gateway/transcript-operations.ts';
@@ -129,7 +129,7 @@ export class Phase1Service {
   constructor(store: WorkspaceStore, runtimeRoot: string, context: Phase1Context) { this.store = store; this.runtimeRoot = runtimeRoot; this.context = context; }
   versions(projectId: string) { return new ProjectVersions(this.store.forProject(projectId), this.runtimeRoot, this.context.nativeUrl(projectId)); }
   get workRounds() { return new WorkRounds(this.store, this.context.tracking); }
-  async call(name: string, args: any, host?: HostContext, options?: { attributeEntry?: boolean; channel?: 'gui' | 'mcp' }) {
+  async call(name: string, args: any, host?: HostContext, options?: { attributeEntry?: boolean; channel?: 'gui' | 'mcp'; mcpChannel?: McpChannel; emitUpgradeLinkResult?: boolean }) {
     const requestedName = publicToolName(name);
     name = legacyToolName(name);
     try {
@@ -154,7 +154,7 @@ export class Phase1Service {
       throw error;
     }
   }
-  private async invoke(name: string, args: any, host?: HostContext, requestedName = publicToolName(name), options?: { attributeEntry?: boolean; channel?: 'gui' | 'mcp' }) {
+  private async invoke(name: string, args: any, host?: HostContext, requestedName = publicToolName(name), options?: { attributeEntry?: boolean; channel?: 'gui' | 'mcp'; mcpChannel?: McpChannel; emitUpgradeLinkResult?: boolean }) {
     const definition = phase1Tools.find(tool => tool.name === requestedName);
     if (!definition) throw new Error('MCP_TOOL_NOT_EXPOSED: ' + name);
     args = normalizeToolInput(definition.inputSchema, args);
@@ -179,7 +179,7 @@ export class Phase1Service {
     if (name === 'motion_get_project' && !args.projectId) return this.dispatch(name, args, host);
     const run = async () => {
       if (!this.recovered) { await recoverProjectTransactions(this.store, this.runtimeRoot); this.recovered = true; }
-      const result = await this.dispatch(name, args, host, options?.channel ?? 'mcp');
+      const result = await this.dispatch(name, args, host, options?.channel ?? 'mcp', options?.mcpChannel ?? 'mcp_stdio', options?.emitUpgradeLinkResult ?? true);
       if (name === 'motion_edit_project' || name === 'motion_restore_version') {
         const owner = this.store.projectCatalog().sessions!.find(session => session.artifacts.some(artifact => artifact.projectId === args.projectId))!;
         result.previewHandoff = previewHandoff(this.context.origin(), { projectId: args.projectId, sessionId: owner.id,
@@ -417,7 +417,7 @@ export class Phase1Service {
     }
     return { projectId: args.projectId, review: record, changed: false };
   }
-  async dispatch(name: string, args: any, host?: HostContext, channel: 'gui' | 'mcp' = 'mcp'): Promise<any> {
+  async dispatch(name: string, args: any, host?: HostContext, channel: 'gui' | 'mcp' = 'mcp', mcpChannel: McpChannel = 'mcp_stdio', emitUpgradeLinkResult = true): Promise<any> {
     if (name.startsWith('motion_game_')) return dispatchGameTool(name, args, this.store.directory, this.runtimeRoot);
     if (name === 'motion_design_catalog' || name === 'motion_design_project' || name === 'motion_design_edit' || name === 'motion_design_comments') {
       return dispatchDesignTool(name, args, this.store.directory, this.context.origin(), ref => new AssetLibrary(this.store).resolve(ref));
@@ -432,10 +432,10 @@ export class Phase1Service {
       if (args.action === 'scenario') {
         return scenarioOperation(scenarioRunsFor(this.store, this.context.tracking), args.scenario, {
           origin: () => this.context.origin(),
-          assets: input => assetOperation(this.store, input, (i, o) => this.importAssets(i, o), this.context.tracking, channel, host, 'scenario'),
+          assets: input => assetOperation(this.store, input, (i, o) => this.importAssets(i, o), this.context.tracking, channel, host, mcpChannel, true, 'scenario'),
           design: designProjectsFor(this.store.directory),
           resolveAsset: ref => new AssetLibrary(this.store).resolve(ref),
-          createMotionProject: input => this.dispatch('motion_create_project', input, host, channel),
+          createMotionProject: input => this.dispatch('motion_create_project', input, host, channel, mcpChannel),
           exportMotionArchive: input => projectArchive(this.store, input, this.runtimeRoot),
         });
       }
@@ -499,15 +499,15 @@ export class Phase1Service {
             changedFiles: [name], previewSync: this.context.nativeUrl(input.projectId) ? 'file_watcher_notified' : 'not_open' }));
         })));
       }
-      return assetOperation(this.store, args, (input, importOptions) => this.importAssets(input, importOptions), this.context.tracking, channel, host);
+      return assetOperation(this.store, args, (input, importOptions) => this.importAssets(input, importOptions), this.context.tracking, channel, host, mcpChannel, emitUpgradeLinkResult);
     }
-    if (name === 'motion_capability_discover') return capabilityDiscover(this.store, args, this.context.tracking, 'mcp');
+    if (name === 'motion_capability_discover') return capabilityDiscover(this.store, args, this.context.tracking, channel, host, mcpChannel);
     if (name === 'motion_capability_run') return capabilityRun(this.store, args, this.context.tracking, 'mcp', host);
-    if (name === 'motion_job_manage') return jobManage(this.store, args, this.context.tracking);
+    if (name === 'motion_job_manage') return jobManage(this.store, args, this.context.tracking, channel, host, mcpChannel, emitUpgradeLinkResult);
     if (name === 'motion_asset_manage') {
       return assetManage(this.store, args, (input, options) => this.importAssets(input, options), this.context.origin(), this.context.tracking);
     }
-    if (name === 'motion_media_use') return mediaUse(this.store, args, this.context.tracking, host);
+    if (name === 'motion_media_use') return mediaUse(this.store, args, this.context.tracking, host, { channel, mcpChannel, emitUpgradeLinkResult });
     if (name === 'motion_get_project' && !args.projectId) {
       if (args.file || args.exportJobId || args.expectedRevision || args.workId || args.includeVideo) throw new ToolInputError('projectId is required for details', 'projectId', 'missing');
       const scope = (args.trashed ? 'trash:' : '') + (args.sessionId ?? 'workspace');

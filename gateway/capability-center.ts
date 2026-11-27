@@ -54,7 +54,7 @@ import {
   scriptProviderTrackingMeta,
   spatialKindForCapability,
 } from './media-telemetry.ts';
-import { mediaUse } from './media-use.ts';
+import { balanceLowTopupForJob, mediaUse, type McpChannel } from './media-use.ts';
 import { discoverOpenDesign3d, discoverOpenDesignSpatial, discoverOpenDesignWorld, type OpenDesign3dDiscovery } from './opendesign-3d.ts';
 import { gatewayFor } from './service.ts';
 import { transcriptOperation } from './transcript-operations.ts';
@@ -303,13 +303,15 @@ export async function capabilityDiscover(
   args: any,
   tracking?: OmTracking,
   channel: 'gui' | 'mcp' = 'mcp',
+  host?: HostContext,
+  mcpChannel: McpChannel = 'mcp_stdio',
 ) {
   const inspectModality = args.modality === 'image' || args.modality === 'video' || args.modality === 'audio'
     ? args.modality
     : undefined;
   if (args.action === 'providers') {
-    if (args.provider) return mediaUse(store, { action: 'reference', provider: args.provider }, tracking);
-    return mediaUse(store, { action: 'inspect', ...(inspectModality ? { modality: inspectModality } : {}) }, tracking);
+    if (args.provider) return mediaUse(store, { action: 'reference', provider: args.provider }, tracking, host, { channel, mcpChannel });
+    return mediaUse(store, { action: 'inspect', ...(inspectModality ? { modality: inspectModality } : {}) }, tracking, host, { channel, mcpChannel });
   }
   if (args.action === 'models') {
     if (args.modality === '3d') {
@@ -374,6 +376,8 @@ export async function capabilityDiscover(
         limit: args.limit,
       },
       tracking,
+      host,
+      { channel, mcpChannel },
     );
   }
 
@@ -511,6 +515,8 @@ export async function capabilityDiscover(
       store,
       { action: 'inspect', ...(inspectModality ? { modality: inspectModality } : {}) },
       tracking,
+      host,
+      { channel, mcpChannel },
     )) as {
       providers: unknown;
       defaults: unknown;
@@ -1537,7 +1543,15 @@ export async function capabilityRun(
   }
 }
 
-export async function jobManage(store: WorkspaceStore, args: any, tracking?: OmTracking) {
+export async function jobManage(
+  store: WorkspaceStore,
+  args: any,
+  tracking?: OmTracking,
+  channel: 'gui' | 'mcp' = 'mcp',
+  host?: HostContext,
+  mcpChannel: McpChannel = 'mcp_stdio',
+  emitUpgradeLinkResult = true,
+) {
   const gateway = gatewayFor(store, tracking);
   if (args.action === 'list') {
     const cap = typeof args.limit === 'number' ? Math.max(1, Math.min(100, args.limit)) : 100;
@@ -1559,7 +1573,16 @@ export async function jobManage(store: WorkspaceStore, args: any, tracking?: OmT
     if (args.action === 'resume') return { job: await gateway.resume(job.id, args.requestId) };
     if (args.action === 'retry_save') return { job: await gateway.retrySave(job.id) };
     if (args.action === 'cancel') return { job: await gateway.cancel(job.id, { source: 'mcp' }) };
-    return { job };
+    const topupFields = await balanceLowTopupForJob(gateway, job, {
+      channel,
+      mcpChannel,
+      studioId: job.projectId ? 'motion' : 'assets',
+      directory: (store.workspaceStore ?? store).directory,
+      tracking,
+      host,
+      emitUpgradeLinkResult,
+    });
+    return { job, ...topupFields };
   }
   throw new ToolInputError('unsupported job manage action', 'action', 'invalid_enum');
 }

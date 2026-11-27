@@ -6,6 +6,7 @@ import path from 'node:path';
 import type { WorkspaceStore } from '../workspace.ts';
 import { AssetLibrary } from './asset-library.ts';
 import { preflightAssetCapabilityGenerate } from './capability-center.ts';
+import { balanceLowTopupForJob, type McpChannel } from './media-use.ts';
 import {
   classifyRejectionError,
   extractRequestReferenceMeta,
@@ -25,6 +26,8 @@ export async function assetOperation(
   tracking?: OmTracking,
   channel: 'gui' | 'mcp' = 'mcp',
   host?: HostContext,
+  mcpChannel: McpChannel = 'mcp_stdio',
+  emitUpgradeLinkResult = true,
   entrySurfaceOverride?: MediaGenerationEntrySurface,
 ) {
   const library = new AssetLibrary(store), gateway = gatewayFor(store, tracking);
@@ -105,7 +108,18 @@ export async function assetOperation(
       throw err;
     }
     if (args.action === 'resume') return { job: await gateway.resume(job.id, args.requestId) };
-    return { job: args.action === 'retry_save' ? await gateway.retrySave(job.id) : args.action === 'cancel' ? await gateway.cancel(job.id, { source: channel === 'gui' ? 'studio' : 'mcp' }) : job };
+    if (args.action === 'retry_save') return { job: await gateway.retrySave(job.id) };
+    if (args.action === 'cancel') return { job: await gateway.cancel(job.id, { source: channel === 'gui' ? 'studio' : 'mcp' }) };
+    const topupFields = await balanceLowTopupForJob(gateway, job, {
+      channel,
+      mcpChannel,
+      studioId: 'assets',
+      directory: (store.workspaceStore ?? store).directory,
+      tracking,
+      host,
+      emitUpgradeLinkResult,
+    });
+    return { job, ...topupFields };
   }
   if (args.action === 'import_to_project') {
     if (!importProject || !args.projectId || !args.requestId) throw new Error('Explicit projectId and requestId are required');

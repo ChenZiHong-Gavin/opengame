@@ -722,25 +722,29 @@ All plugin login and upgrade touchpoints share the closed `entitlementHookIds` e
   distinct impressions and clicks for the publish panel (`game_publish_panel_signin`), failed publish card
   (`game_publish_failed_signin`), post-publish share hook (`game_publish_post_signin`), and Telegram link step
   (`game_publish_telegram_signin`), each with `studio_id=game` and `publish_target=game`.
-- Click: `ui_click` with `hook_id` + `entry_id` across header Pricing (`header_pricing`), header account/subscription
-  entries (`open_account`, `open_subscription`, `open_browser_signin`), Black Friday banner & Explore hero
-  (`bf_banner`, `explore_bf_hero`), Model Hub header pill and cards (`model_hub_bf_pill`, `model_hub_signin`,
-  `model_hub_upgrade`), Settings sign-in/subscription/provider links (`settings_signin`, `settings_subscription`,
-  `get_api_key`, `open_browser_signin`), Media & Sound composer gates (`studio_generate`, `studio_free_gate`,
-  `connect_provider`), and Cloud Share / Game Publish (`game_publish_signin`, `game_publish_panel_signin`,
-  `game_publish_failed_signin`, `game_publish_post_signin`, `game_publish_telegram_signin`,
-  `game_publish_unlisted_upgrade`, `cloud_share_signin`, `open_account_settings`). Super Agent's inline sign-in /
-  upgrade cards report under the same Media gate hooks (`studio_generate` / `studio_free_gate`,
-  `page_name=creative_studio`, `studio_id=game`): the in-card login forwards that hook + click `entry_id`, the upgrade
-  anchor opens the attributed pricing page with the same `entry_id`, and a detected upgrade emits
-  `entitlement_refresh_result` before the conversation resumes. The Super Agent publish sign-in card (publish blocked
-  while signed out) reports under the Cloud Share hooks instead (`game_publish_signin` for games, `cloud_share_signin`
-  otherwise, plus `publish_target`) and forwards that hook + click `entry_id` to login.
-- Backend join: `POST /api/settings/account/login` forwards `{ hookId, entryId }` to `account_sign_in_result` and passes
-  `VELA_LOGIN_SOURCE_PRODUCT`, `VELA_LOGIN_ENTRY_ID`, `VELA_LOGIN_SOURCE_DETAIL`, and `VELA_LOGIN_ENTRY_OCCURRED_AT`
-  into the `vela login` connector process so AMR attributes browser activation to the originating touchpoint;
-  `POST /api/settings/account/subscription` forwards `entryId` into `od_entry_id` (prefixed with `opengame-` in
-  OpenGame builds) while preserving the AMR-registered `od_entry_source=openmotion_manage_subscription`.
+- Click: attributed `ui_click` events carry `hook_id` + `entry_id` across header Pricing (`header_pricing`), header
+  sign-in (`header_signin`), Black Friday banner & Explore hero (`bf_banner`, `explore_bf_hero`), Model Hub header pill
+  and cards (`model_hub_bf_pill`, `model_hub_signin`, `model_hub_upgrade`), Settings sign-in/subscription actions
+  (`settings_signin`, `settings_subscription`, plus `open_browser_signin` when a sign-in attribution is active), Media
+  & Sound composer gates (`studio_generate`, `studio_free_gate`), and Cloud Share / Game Publish
+  (`game_publish_signin`, `game_publish_panel_signin`, `game_publish_failed_signin`, `game_publish_post_signin`,
+  `game_publish_telegram_signin`, `game_publish_unlisted_upgrade`, `cloud_share_signin`). Supplementary navigation and
+  setup clicks (`open_account`, `open_subscription`, `get_api_key`, `connect_provider`, plus fallback
+  `open_browser_signin` and `open_account_settings` which carry `hook_id` without a checkout `entry_id`) record intent
+  without joining to a specific checkout `entry_id`. Super Agent's inline sign-in / upgrade cards report under the same
+  Media gate hooks (`studio_generate` / `studio_free_gate`, `page_name=creative_studio`, `studio_id=game`): the in-card
+  login forwards that hook + click `entry_id`, the upgrade anchor opens the attributed pricing page with the same
+  `entry_id`, and a detected upgrade emits `entitlement_refresh_result` before the conversation resumes. The Super Agent
+  publish sign-in card (publish blocked while signed out) reports under the Cloud Share hooks instead
+  (`game_publish_signin` for games, `cloud_share_signin` otherwise, plus `publish_target`) and forwards that hook +
+  click `entry_id` to login.
+- Backend join: `POST /api/settings/account/login` forwards `{ hookId, entryId }` (plus optional `studioId`, `modality`,
+  and `entryFrom`) to `account_sign_in_result` and passes `OPEN_DESIGN_AMR_ORIGIN`, `OPEN_DESIGN_AMR_ENTRY_ID`,
+  `OPEN_DESIGN_AMR_ENTRY_SOURCE`, `OPEN_DESIGN_AMR_ENTRY_AT`, and `OPEN_DESIGN_AMR_PLACEMENT_ID` into the spawned
+  `vela login` connector process so AMR attributes browser activation to the originating touchpoint;
+  `POST /api/settings/account/subscription` forwards the 4D `od_*` query parameters (`od_origin`, `od_entry_source`,
+  `od_entry_id` prefixed with `opengame-` in OpenGame builds, `od_entry_at`, and `od_placement_id`) to the OpenDesign
+  dashboard billing page without `utm_*` parameters.
 - Return refresh: returning to the window after checkout emits `entitlement_refresh_result` (`hook_id`, `entry_id`,
   `outcome`, `plan_changed`) through the shared `refreshEntitlementAfterCheckout` helper.
 

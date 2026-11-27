@@ -156,7 +156,7 @@ export function SoundComposer({
     if (!showingAccountSignIn) { signInGateReportedRef.current = false; return; }
     if (signInGateReportedRef.current) return;
     signInGateReportedRef.current = true;
-    tracking.reportEntitlementGateView('creative_studio', 'studio_generate', { ...(studioId ? { studio_id: studioId } : {}) });
+    tracking.reportEntitlementGateView('creative_studio', 'studio_generate', { ...(studioId ? { studio_id: studioId } : {}), modality: 'audio' });
   }, [unconfiguredPreferred, preferredProvider?.id, studioId]);
   const previewModel = selected ?? preferred;
   const parameters = previewModel ? parameterDrafts[previewModel.id] ?? emptyParameters : emptyParameters;
@@ -215,7 +215,7 @@ export function SoundComposer({
     } catch (error) {
       tracking.reportAssetGenerationSubmit('audio', 'failure', draft.references.length, false, studioContext);
       const gate = detectMonetizationGateFromError(error as { status?: number; code?: string; message?: string });
-      if (gate) openMonetizationGate({ ...gate, pageName: 'creative_studio', studioId });
+      if (gate) openMonetizationGate({ ...gate, pageName: 'creative_studio', studioId, modality: 'audio' });
       if (mounted.current) onError((error as Error).message);
     } finally {
       if (mounted.current) setBusy(false);
@@ -502,7 +502,7 @@ export function SoundComposer({
                 onClick={() => {
                   if (preferredProvider!.id === 'account') {
                     const entryId = tracking.newTrackingId();
-                    setPendingAttribution('sign_in', 'studio_generate', entryId);
+                    setPendingAttribution('sign_in', 'studio_generate', entryId, { studioId, modality: 'audio' });
                     send('ui_click', {
                       page_name: 'creative_studio',
                       area: 'asset_create',
@@ -510,6 +510,7 @@ export function SoundComposer({
                       hook_id: 'studio_generate',
                       entry_id: entryId,
                       studio_id: studioId,
+                      modality: 'audio',
                     });
                     (openAccountSettings ?? openModelSettings)();
                   } else if (openProviderSettings) {
@@ -536,6 +537,7 @@ export function SoundComposer({
             <StudioFreeGateCard
               pageName="creative_studio"
               studioId={studioId}
+              modality="audio"
               testId="sound-studio-free-gate"
               iconSize={18}
               onManageSubscription={() => (openSubscriptionSettings ?? openAccountSettings ?? openModelSettings)()}

@@ -21,6 +21,10 @@ export function trackingPreference(directory: string): boolean {
   try { return JSON.parse(readFileSync(path.join(directory, 'tracking/preferences.json'), 'utf8')).enabled === true; }
   catch (error) { return (error as NodeJS.ErrnoException).code === 'ENOENT'; }
 }
+export function telemetryEnabledFor(directory: string, tracking?: OmTracking): boolean {
+  if (trackingLocked() || !trackingPreference(directory)) return false;
+  return tracking ? tracking.enabled() : true;
+}
 export async function saveTrackingPreference(directory: string, enabled: boolean) {
   const folder = path.join(directory, 'tracking'); await mkdir(folder, { recursive: true, mode: 0o700 });
   const temporary = path.join(folder, 'preferences.' + crypto.randomUUID() + '.tmp');

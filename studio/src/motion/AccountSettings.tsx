@@ -20,7 +20,7 @@ import { MultimodalUpgradeButton } from './MultimodalOfferCard';
 import { activeAccountOffer, MULTIMODAL_CAPABILITIES } from './accountOffer';
 import { ModelAvatar, SettingsError, SettingsLoading } from './settingsPrimitives';
 import offerStyles from './GenerationOffer.module.css';
-import { consumePendingAttribution, evaluateEntitlementRefresh, readAccountPlan, type EntryAttribution } from './entitlementAttribution';
+import { consumePendingAttribution, evaluateEntitlementRefresh, readAccountPlan, resolveSettingsAttribution, type EntryAttribution } from './entitlementAttribution';
 import { setMotionSignedIn } from './trackingContext';
 
 type GuideArea = 'account' | 'provider_detail' | StudioDestination;
@@ -144,7 +144,7 @@ export function useAccountSignIn(area: GuideArea, showToast: ShowToast, provider
   const { account, refresh } = state;
   const accountState = account?.state;
   const inGenerator = typeof area !== 'string';
-  const refreshBilling = useCallback(async (checkout?: { hookId: ReturnType<typeof consumePendingAttribution>['hookId']; entryId: string }) => {
+  const refreshBilling = useCallback(async (checkout?: EntryAttribution) => {
     const prevPlan = readAccountPlan(account);
     const updated = await refresh(true);
     const { billingOk, planChanged } = evaluateEntitlementRefresh(prevPlan, updated);
@@ -154,12 +154,31 @@ export function useAccountSignIn(area: GuideArea, showToast: ShowToast, provider
     // The header balance reads its own copy of the account; announce a new balance so it follows.
     if (updated && updated.balance !== account?.balance) window.dispatchEvent(new Event('motion:account-changed'));
     if (checkout) {
-      tracking.reportEntitlementRefresh(inGenerator ? 'creative_studio' : 'settings', checkout.hookId, checkout.entryId, billingOk ? 'success' : 'failure', planChanged);
+      tracking.reportEntitlementRefresh(
+        inGenerator ? 'creative_studio' : 'settings',
+        checkout.hookId,
+        checkout.entryId,
+        billingOk ? 'success' : 'failure',
+        planChanged,
+        {
+          ...(checkout.studioId ? { studio_id: checkout.studioId } : {}),
+          ...(checkout.modality ? { modality: checkout.modality } : {}),
+          ...(checkout.entryFrom ? { entry_from: checkout.entryFrom } : {}),
+        },
+      );
     }
   }, [account, refresh, inGenerator]);
   const trackAction = (element: Parameters<typeof tracking.reportSettingsClick>[1], includeProvider = false, attribution?: EntryAttribution) => {
     if (inGenerator) reportCreativeClick('creative_studio', 'asset_create', element, destinationTarget(area), attribution);
-    else tracking.reportSettingsClick(area, element, { ...(includeProvider && provider ? { provider } : {}), ...(attribution && { hook_id: attribution.hookId, entry_id: attribution.entryId }) });
+    else tracking.reportSettingsClick(area, element, {
+      ...(includeProvider && provider ? { provider } : {}),
+      ...(attribution ? {
+        hook_id: attribution.hookId,
+        entry_id: attribution.entryId,
+        ...(attribution.studioId ? { studio_id: attribution.studioId } : {}),
+        ...(attribution.modality ? { modality: attribution.modality } : {}),
+      } : {}),
+    });
   };
   const subscription = useSubscriptionOpener((element, attribution) => trackAction(element, false, attribution), message => showToast(message, 'error'), refreshBilling);
   // Order matters: the event below triggers a plain refresh, so the billing refresh must be issued after it to win.
@@ -182,12 +201,21 @@ export function useAccountSignIn(area: GuideArea, showToast: ShowToast, provider
       : inGenerator
         ? 'studio_generate'
         : 'settings_signin';
-    const attribution = name === 'login' ? cardAttribution ?? consumePendingAttribution('sign_in', fallbackSignInHook) : undefined;
+    const attribution = name === 'login'
+      ? resolveSettingsAttribution(cardAttribution ?? consumePendingAttribution('sign_in', fallbackSignInHook))
+      : undefined;
     if (name === 'login') lastSignInAttributionRef.current = attribution;
     if (!cardAttribution) trackAction(name === 'login' ? 'sign_in' : name === 'logout' ? 'sign_out' : 'cancel_sign_in', true, attribution);
     setBusy(true);
     try {
-      state.setAccount(await gatewayRequest<AccountSummary>('settings/account/' + name, 'POST', attribution ?? {}));
+      const payload = attribution ? {
+        hookId: attribution.hookId,
+        entryId: attribution.entryId,
+        ...(attribution.studioId ? { studioId: attribution.studioId } : {}),
+        ...(attribution.modality ? { modality: attribution.modality } : {}),
+        ...(attribution.entryFrom ? { entryFrom: attribution.entryFrom } : {}),
+      } : {};
+      state.setAccount(await gatewayRequest<AccountSummary>('settings/account/' + name, 'POST', payload));
       if (!inGenerator) notifyProvidersChanged();
       window.dispatchEvent(new Event('motion:account-changed'));
     }

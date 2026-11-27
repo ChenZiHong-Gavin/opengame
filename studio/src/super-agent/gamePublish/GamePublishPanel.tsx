@@ -197,7 +197,7 @@ function OpenDesignChoice({ session, onNotify }: { session: GamePublishSession; 
     window.setTimeout(() => setUpgradeEntryId(newCampaignEntryId()), 0);
   }
 
-  const upgradeHref = campaignPricingUrl(locale, 'opengame_publish_unlisted', upgradeEntryId);
+  const upgradeHref = campaignPricingUrl(locale, 'opengame_publish_unlisted', upgradeEntryId, { studioId: 'game', modality: 'all' });
 
   return (
     <div className="om-gp-od-block">

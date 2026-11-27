@@ -156,6 +156,7 @@ const campaign = { campaign_id: ['black_friday_2026'], entry_id: 'uuid', hook_id
 // Workspace assets: which shelf the library shows and what kind of media an action is about.
 const assetKind = ['all', 'image', 'video', 'audio', 'trash'] as const;
 const modality = ['image', 'video', 'audio'] as const;
+const attributionModality = ['image', 'video', 'audio', 'all'] as const;
 // Settings sections as routed in the workspace; providers and Agents are named by their built-in ids only.
 const settingsSection = ['account', 'subscription', 'providers', 'models', 'local', 'general', 'appearance', 'privacy', 'about', 'help', 'mcp', 'brand-kit'] as const;
 const provider = { provider_id: 'slug', provider_kind: ['builtin', 'custom', 'account', 'agent'] } as const;
@@ -272,7 +273,8 @@ export const omEvents = {
   // sign-in continues with a new attempt. Times are milliseconds since the click. Stage values come from the connector
   // protocol; only confirmed account IDs are allowed, never links, authorization codes or credentials.
   account_sign_in_result: { producers: ['mcp'], fields: { attempt_id: 'uuid', outcome: ['success', 'failure', 'cancelled', 'replaced'],
-    source_product: 'code', source_detail: 'code', hook_id: entitlementHookIds, entry_id: 'uuid', entry_occurred_at: 'timestamp', amr_user_id: 'code',
+    source_product: ['openmotion', 'opengame'], source_detail: ['openmotion_editor_login', 'opengame_editor_login', ...entitlementHookIds], hook_id: entitlementHookIds, entry_id: 'uuid', entry_occurred_at: 'timestamp',
+    entry_from: providerSetupEntries, studio_id: 'slug', modality: attributionModality, amr_user_id: 'code',
     error_code: ['connector_unavailable', 'setup_failed', 'authorization_expired', 'credentials_rejected'],
     connector_problem: ['npm_missing', 'install_failed', 'start_failed'], connector_version: 'code', resumed: 'boolean',
     last_stage: accountStages, last_result: ['started', 'success', 'failed'], error_kind: accountErrorKinds, browser_opened: 'boolean',
@@ -340,9 +342,9 @@ export const omEvents = {
   recovery_recorded: { producers: ['mcp', 'worker'], fields: { incident_id: 'uuid', test_case_id: 'code', fault_type: 'code', data_integrity: ['preserved', 'lost', 'unknown'], duplicate_charge_check: ['clear', 'found', 'unknown'], recovery_result: ['success', 'failure', 'unknown'] }, required: ['incident_id', 'test_case_id', 'fault_type', 'data_integrity', 'duplicate_charge_check', 'recovery_result'] },
   page_view: { producers: ['studio'], fields: { page_name: pages, view_id: 'uuid', embedded: 'boolean', has_project: 'boolean', brand_collection: brandCollection, entry_from: entryFrom, mcp_client: mcpClient, settings_section: settingsSection,
     studio_id: creative.studio_id, scene_id: creative.scene_id, model_provider: creative.model_provider, model_id: creative.model_id, explore_community: creative.explore_community, medium: creative.medium, landing: creative.landing, hub_id: modelHub.hub_id, signed_in: modelHub.signed_in }, required: ['page_name', 'view_id', 'embedded', 'has_project'] },
-  provider_setup_opened: { producers: ['mcp'], fields: { entry_from: providerSetupEntries, presentation: ['foreground', 'background', 'now'], embedded: 'boolean' },
+  provider_setup_opened: { producers: ['mcp'], fields: { entry_from: providerSetupEntries, presentation: ['foreground', 'background', 'now'], embedded: 'boolean', studio_id: 'slug', modality: attributionModality },
     required: ['entry_from', 'presentation', 'embedded'] },
-  upgrade_link_result: { producers: ['mcp'], fields: { entry_from: ['agent_media_upgrade_free', 'agent_media_upgrade_go'], entry_id: 'uuid', outcome: ['success', 'failure'], modality },
+  upgrade_link_result: { producers: ['mcp'], fields: { entry_from: ['agent_media_upgrade_free', 'agent_media_upgrade_go', 'agent_media_balance_low'], entry_id: 'uuid', outcome: ['success', 'failure'], channel: ['mcp_stdio', 'mcp_http'], studio_id: 'slug', modality: attributionModality },
     required: ['entry_from', 'outcome'] },
   studio_load_result: { producers: ['studio'], fields: { load_id: 'uuid', outcome, duration_ms: 'integer', embedded: 'boolean', ...project, ...projectScale, ...template }, required: ['load_id', 'outcome', 'duration_ms', 'embedded'] },
   ui_click: { producers: ['studio'], fields: { page_name: pages,
@@ -410,7 +412,7 @@ export const omEvents = {
     ...skill, ...brand, brand_collection: brandCollection, ...mcp, entry_from: entryFrom, ...referenceEntry, ...referenceSource,
     doc_id: ['mcp_tools', 'skills', 'agent_adapters', 'docs_home', 'repository'], section_id: 'slug', faq_index: 'integer',
     search_scope: paletteScope, palette_item_kind: paletteItemKind, palette_action: paletteAction, resource_id: 'slug',
-    ...workspacePages, ...creative, ...modelHub, ...campaign, ...generationOffer,
+    ...workspacePages, modality: attributionModality, ...creative, ...modelHub, ...campaign, ...generationOffer,
     ...game, game_option_kind: ['genre', 'style', 'setting', 'orientation', 'playable_ad', 'multiplayer'], game_view: ['preview', 'code', 'trailer'], publish_target: webPublishTargets },
     required: ['page_name', 'area', 'element'] },
   // Studio UI exports run in the editor's own render pipeline, not the worker that owns export_result.
@@ -442,7 +444,7 @@ export const omEvents = {
   surface_view: { producers: ['studio'], fields: { page_name: pages, area: ['template_library', 'template_card', 'template_detail', 'template_instruction', 'template_discovery', 'template_related', 'template_guide', 'skill_detail', 'brand_detail', 'template_series_card', 'template_series_detail', 'template_series_work', 'campaign_banner', 'command_palette', 'template_zero_result_skills', 'asset_create', 'account', 'entitlement_modal', 'entitlement_gate', 'game_detail', 'game_handoff', 'hub_header', 'provider_detail'],
     element: ['library', 'card', 'detail', 'instruction', 'search_recovery', 'reference', 'related', 'guide', 'banner', 'palette', 'skill_fallback', 'modal', 'gate_card', 'handoff'], ...generationOffer, settings_section: settingsSection, scene_id: creative.scene_id, ...campaign, placement, position: 'integer', source_template_id: 'slug', ...templateList, ...templateDetail, ...template, ...templateSeries,
     ...skill, ...brand, ...referenceEntry, brand_state: brandState, recovery_reason: ['no_results', 'unsuitable', 'catalog_empty'],
-    studio_id: creative.studio_id, ...game, publish_target: webPublishTargets, hub_id: modelHub.hub_id, signed_in: modelHub.signed_in },
+    studio_id: creative.studio_id, modality: attributionModality, ...game, publish_target: webPublishTargets, hub_id: modelHub.hub_id, signed_in: modelHub.signed_in },
     required: ['page_name', 'area', 'element'] },
   // Global Cmd+K command palette settled search; one per settled query, never per keystroke.
   command_palette_search_result: { producers: ['studio'], fields: { page_name: pages, area: ['command_palette'],
@@ -525,6 +527,7 @@ export const omEvents = {
     required: ['publish_target', 'action', 'outcome', 'publish_attempt_id'] },
   // Reported when the user returns from an external Pricing / subscription checkout and Studio refreshes their billing entitlement.
   entitlement_refresh_result: { producers: ['studio'], fields: { page_name: pages, hook_id: entitlementHookIds, entry_id: 'uuid',
+    entry_from: providerSetupEntries, studio_id: 'slug', modality: attributionModality,
     outcome: ['success', 'failure'], plan_changed: 'boolean' },
     required: ['page_name', 'outcome', 'plan_changed'] },
   brand_kit_create_result: { producers: ['studio'], fields: { page_name: ['brand_kit'], outcome: ['success', 'failure'], create_attempt_id: 'uuid' },

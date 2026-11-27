@@ -41,6 +41,35 @@ export function evaluateEntitlementRefresh(
   return { billingOk, planChanged };
 }
 
+export function captureCurrentPlan(): Promise<string | undefined> {
+  return gatewayRequest<AccountSummary>('settings/account')
+    .then(summary => readAccountPlan(summary))
+    .catch(() => undefined);
+}
+
+/** Shared post-checkout account refresh and attribution reporting. */
+export function refreshEntitlementAfterCheckout(
+  trackingPage: NonNullable<Fields<'entitlement_refresh_result'>['page_name']>,
+  hookId: EntitlementHookId,
+  entryId: string,
+  prevPlanPromise: Promise<string | undefined> = Promise.resolve(undefined),
+  onError?: (message: string) => void,
+): Promise<void> {
+  return Promise.all([prevPlanPromise, gatewayRequest<AccountSummary>('settings/account?refresh=true')])
+    .then(([prevPlan, updated]) => {
+      const { billingOk, planChanged } = evaluateEntitlementRefresh(prevPlan, updated);
+      reportEntitlementRefresh(trackingPage, hookId, entryId, billingOk ? 'success' : 'failure', planChanged);
+      if (billingOk) {
+        notifyProvidersChanged();
+        window.dispatchEvent(new Event('motion:account-changed'));
+      }
+    })
+    .catch((error: unknown) => {
+      reportEntitlementRefresh(trackingPage, hookId, entryId, 'failure', false);
+      if (onError) onError(error instanceof Error ? error.message : String(error));
+    });
+}
+
 /** Shared checkout-return listener for PricingEntry and BlackFridayTopBanner. */
 export function useCheckoutReturnRefresh(
   trackingPage: NonNullable<Fields<'entitlement_refresh_result'>['page_name']>,
@@ -53,18 +82,7 @@ export function useCheckoutReturnRefresh(
       const pending = pendingRef.current;
       if (!pending || document.visibilityState !== 'visible') return;
       pendingRef.current = undefined;
-      void Promise.all([pending.prevPlanPromise, gatewayRequest<AccountSummary>('settings/account?refresh=true')])
-        .then(([prevPlan, updated]) => {
-          const { billingOk, planChanged } = evaluateEntitlementRefresh(prevPlan, updated);
-          reportEntitlementRefresh(trackingPage, hookId, pending.entryId, billingOk ? 'success' : 'failure', planChanged);
-          if (billingOk) {
-            notifyProvidersChanged();
-            window.dispatchEvent(new Event('motion:account-changed'));
-          }
-        })
-        .catch(() => {
-          reportEntitlementRefresh(trackingPage, hookId, pending.entryId, 'failure', false);
-        });
+      void refreshEntitlementAfterCheckout(trackingPage, hookId, pending.entryId, pending.prevPlanPromise);
     };
     window.addEventListener('focus', onReturn);
     document.addEventListener('visibilitychange', onReturn);
@@ -75,9 +93,6 @@ export function useCheckoutReturnRefresh(
   }, [trackingPage, hookId]);
 
   return useCallback((entryId: string) => {
-    const prevPlanPromise = gatewayRequest<AccountSummary>('settings/account')
-      .then(summary => readAccountPlan(summary))
-      .catch(() => undefined);
-    pendingRef.current = { entryId, prevPlanPromise };
+    pendingRef.current = { entryId, prevPlanPromise: captureCurrentPlan() };
   }, []);
 }

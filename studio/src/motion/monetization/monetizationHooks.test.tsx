@@ -63,6 +63,7 @@ describe('OpenGame monetization attribution & gate hooks', () => {
       .toMatchObject({ kind: 'balance', reason: 'insufficient_balance' });
     expect(detectMonetizationGateFromError({ code: 'quota_exceeded' })).toMatchObject({ kind: 'balance', reason: 'quota_exceeded' });
     expect(detectMonetizationGateFromError({ code: 'concurrency_limit' })).toMatchObject({ kind: 'concurrency', reason: 'concurrency_limit' });
+    expect(detectMonetizationGateFromError({ code: 'video_concurrency_limit_exceeded' })).toMatchObject({ kind: 'concurrency', reason: 'concurrency_limit' });
     expect(detectMonetizationGateFromError({ status: 503, message: 'insufficient balance' })).toBeNull();
     expect(detectMonetizationGateFromError({ status: 502, message: 'Bad Gateway' })).toBeNull();
     expect(readPreviewGateFromSearch('?previewGate=balance')).toMatchObject({ kind: 'balance' });
@@ -268,5 +269,33 @@ describe('OpenGame monetization attribution & gate hooks', () => {
     expect(onRecovered).toHaveBeenCalledTimes(2);
     expect(document.querySelector('[data-testid="monetization-gate-resume-error"]')).toBeNull();
     expect(document.querySelector('[data-testid="monetization-gate-recovered"]')).not.toBeNull();
+  });
+
+  it('suppresses motion:account-changed when shared post-checkout entitlement refresh fails', async () => {
+    const { gatewayRequest } = await import('../gatewayClient');
+    const { refreshEntitlementAfterCheckout } = await import('../entitlementAttribution');
+    const mockGateway = vi.mocked(gatewayRequest);
+    mockGateway.mockResolvedValueOnce({ state: 'signed-in', plan: 'free', billingUnavailable: true });
+
+    const accountChanged = vi.fn();
+    window.addEventListener('motion:account-changed', accountChanged);
+    try {
+      await refreshEntitlementAfterCheckout('creative_studio', 'studio_free_gate', '7d1c6f4e-6a1f-4c55-9a43-0c7a4a0a8f11', Promise.resolve('free'));
+      expect(accountChanged).not.toHaveBeenCalled();
+      expect(tracked().filter(item => item.event === 'entitlement_refresh_result')).toEqual([
+        {
+          event: 'entitlement_refresh_result',
+          properties: {
+            page_name: 'creative_studio',
+            hook_id: 'studio_free_gate',
+            entry_id: '7d1c6f4e-6a1f-4c55-9a43-0c7a4a0a8f11',
+            outcome: 'failure',
+            plan_changed: false,
+          },
+        },
+      ]);
+    } finally {
+      window.removeEventListener('motion:account-changed', accountChanged);
+    }
   });
 });

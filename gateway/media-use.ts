@@ -60,15 +60,15 @@ export async function mediaUse(store: WorkspaceStore, args: any, tracking?: OmTr
       : undefined;
     const entry = resolveMediaSetupEntry(providers, modality ? { modality, capabilities: status.capabilities } : undefined);
     let upgrade: { url: string; entryId: string; plan: 'plus'; instruction: string } | undefined;
-    let upgradeLinkResult: { entry_from: 'agent_media_upgrade_free' | 'agent_media_upgrade_go'; outcome: 'success' | 'failure'; entry_id?: string } | undefined;
+    let upgradeLinkResult: { entry_from: 'agent_media_upgrade_free' | 'agent_media_upgrade_go'; outcome: 'success' | 'failure'; entry_id?: string; modality?: Modality } | undefined;
     if (entry === 'agent_media_upgrade_free' || entry === 'agent_media_upgrade_go') {
       try {
         const entryId = randomUUID();
         const { url } = await gateway.account.upgradeLink(entryId);
         upgrade = { url, entryId, plan: 'plus', instruction: 'Present url to the user as a clickable "Upgrade to Plus / 升级到 Plus" link, then inspect again after payment and continue the original request.' };
-        upgradeLinkResult = { entry_from: entry, outcome: 'success', entry_id: entryId };
+        upgradeLinkResult = { entry_from: entry, outcome: 'success', entry_id: entryId, ...(modality ? { modality } : {}) };
       } catch {
-        upgradeLinkResult = { entry_from: entry, outcome: 'failure' };
+        upgradeLinkResult = { entry_from: entry, outcome: 'failure', ...(modality ? { modality } : {}) };
       }
     }
     return { providers,
@@ -99,15 +99,19 @@ export async function mediaUse(store: WorkspaceStore, args: any, tracking?: OmTr
       throw new ToolInputError('provider, model, projectId, requestId, modality and prompt are required', missing ?? 'prompt', 'missing');
     }
     const job = await gateway.submit({ projectId: args.projectId, model: `${args.provider}:${args.model}`, modality: args.modality,
-      prompt: args.prompt, parameters: args.parameters, mode: args.mode, referenceAsset: args.referenceAsset, idempotencyKey: args.requestId } as GenerateInput, host);
+      prompt: args.prompt, parameters: args.parameters, mode: args.mode, referenceAsset: args.referenceAsset, idempotencyKey: args.requestId } as GenerateInput, host, { entrySurface: 'mcp_media_use' });
     return { projectId: job.projectId, job, next: { action: 'status', projectId: job.projectId, jobId: job.id } };
   }
   if (args.action === 'status' || args.action === 'cancel' || args.action === 'retry_save' || args.action === 'resume') {
     const job = await gateway.getJob(args.jobId);
     if (job.projectId !== args.projectId || job.model.provider === 'codex') throw new Error('GENERATION_NOT_FOUND: job does not belong to this project');
-    if (args.action !== 'status' && !args.requestId) throw new ToolInputError('requestId is required', 'requestId', 'missing');
+    if (args.action !== 'status' && !args.requestId) {
+      const err = new ToolInputError('requestId is required', 'requestId', 'missing');
+      if (args.action === 'resume' || args.action === 'retry_save') gateway.recordRetryRejection(job, args.action, err);
+      throw err;
+    }
     if (args.action === 'resume') return { projectId: job.projectId, job: await gateway.resume(job.id, args.requestId) };
-    return { projectId: job.projectId, job: args.action === 'retry_save' ? await gateway.retrySave(job.id) : args.action === 'cancel' ? await gateway.cancel(job.id) : job };
+    return { projectId: job.projectId, job: args.action === 'retry_save' ? await gateway.retrySave(job.id) : args.action === 'cancel' ? await gateway.cancel(job.id, { source: 'mcp' }) : job };
   }
   throw new ToolInputError('unsupported media action', 'action', 'invalid_enum');
 }

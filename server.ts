@@ -24,6 +24,8 @@ import { collectWorkspaceResources } from './gateway/super-agent-resources.ts';
 import { listTaskWorkspaceEntries, readTaskWorkspaceFile, resolveBrowsableRoots } from './gateway/super-agent-workspace.ts';
 import { assetHttp } from './gateway/asset-http.ts';
 import { capabilityDiscover, capabilityRun, loadCapabilityCatalog, syncCapabilityRemoteConfig } from './gateway/capability-center.ts';
+import { extractRequestReferenceMeta, isMediaTelemetryModality, recordPreGatewayRejection, spatialKindForCapability } from './gateway/media-telemetry.ts';
+import { findCapability } from './shared/capability-registry.ts';
 import { getWorkflow } from './shared/workflow.ts';
 import { attachmentDisposition } from './shared/http-header.ts';
 import { isMain } from './shared/entry.ts';
@@ -60,6 +62,8 @@ import { recoverProjectTransactions } from './phase1-versions.ts';
 import { verifyExport } from './scripts/verify-export.ts';
 import { createAppTracking, closeTracking, saveTrackingPreference, trackingPreference, trackingLockReason, type OmTracking } from './shared/tracking.ts';
 import { flushCodexSessionTracking, syncActiveCodexThreads } from './shared/codex-session-tracking.ts';
+import { flushHostSessionTracking, syncActiveHostSessions } from './shared/host-session-tracking.ts';
+import { flushSuperAgentSessionTracking } from './shared/super-agent-session-tracking.ts';
 import { studioEvents } from './tracking/events.ts';
 import { configureNativeEnvironment, nativeRuntimeStatus, startNativePreparation, requireNativeRuntime } from './scripts/npm-runtime.mjs';
 import { applySourceUpdate, checkSourceUpdate } from './shared/source-update.ts';
@@ -84,11 +88,12 @@ const working = new Set<string>();
 const runningExports = new Map<string, AbortController>();
 let lastCodexSessionSync = 0;
 
-// Periodic queue_snapshot and worker_heartbeat telemetry was retired; keep the 60s Codex session sync only.
+// Periodic queue_snapshot and worker_heartbeat telemetry was retired; keep the 60s Codex and host session sync only.
 function syncCodexSessionsIfDue(store: WorkspaceStore) {
   if (Date.now() - lastCodexSessionSync < 60_000) return;
   lastCodexSessionSync = Date.now();
   void syncActiveCodexThreads(store.directory).catch(() => {});
+  void syncActiveHostSessions(store.directory).catch(() => {});
 }
 
 export async function cancelExport(store: WorkspaceStore, projectId: string, jobId: string, tracking = store.tracking) {
@@ -1387,7 +1392,30 @@ export async function handler(req: IncomingMessage, res: ServerResponse, store =
       if (url.pathname === '/api/capabilities/run' && req.method === 'POST') {
         const body = await input(req);
         const isDryRun = body?.dryRun === true;
-        if (!isDryRun && !context.studio?.alive()) return json(res, 503, { error: 'Open the Studio before generating media' });
+        if (!isDryRun && !context.studio?.alive()) {
+          const cap = typeof body?.capabilityId === 'string' ? findCapability(body.capabilityId) : undefined;
+          const resolvedModality = isMediaTelemetryModality(cap?.modality)
+            ? cap.modality
+            : isMediaTelemetryModality(body?.modality) ? body.modality : undefined;
+          if (resolvedModality && cap?.executor.kind !== 'service') {
+            const { referenceCount, isEdit } = extractRequestReferenceMeta(body);
+            recordPreGatewayRejection(context.tracking, {
+              modality: resolvedModality,
+              executorKind: cap?.executor.kind === 'script' ? 'script' : 'gateway',
+              capabilityId: typeof body?.capabilityId === 'string' ? body.capabilityId : undefined,
+              spatialKind: spatialKindForCapability(cap?.id),
+              entrySurface: 'studio',
+              destination: 'library',
+              referenceCount,
+              isEdit,
+              hasIdempotencyKey: typeof body?.requestId === 'string' && body.requestId.length > 0,
+              parameters: body?.parameters && typeof body.parameters === 'object' && !Array.isArray(body.parameters) ? body.parameters : undefined,
+              reason: 'STUDIO_NOT_OPEN',
+              category: 'runtime_unavailable',
+            });
+          }
+          return json(res, 503, { error: 'Open the Studio before generating media' });
+        }
         return json(res, isDryRun ? 200 : 202, await capabilityRun(store, { action: 'run', ...body }, context.tracking, 'gui'));
       }
       return json(res, 404, { error: 'Unknown capability center operation' });
@@ -1411,13 +1439,32 @@ export async function handler(req: IncomingMessage, res: ServerResponse, store =
       if (route && req.method === 'PUT') return json(res, 200, await gateway.setRoute(route[1], (await input(req)).model));
       if (url.pathname === '/api/models/custom' && req.method === 'POST') return json(res, 200, await gateway.registerModel(await input(req)));
       if (url.pathname === '/api/generations' && req.method === 'POST') {
-        if (!context.studio?.alive()) return json(res, 503, { error: 'Open the Studio before generating media' });
-        return json(res, 202, { job: await gateway.submit(await input(req)) });
+        if (!context.studio?.alive()) {
+          const body = await input(req).catch(() => undefined);
+          if (isMediaTelemetryModality(body?.modality)) {
+            const { referenceCount, isEdit } = extractRequestReferenceMeta(body);
+            recordPreGatewayRejection(context.tracking, {
+              modality: body.modality,
+              executorKind: 'gateway',
+              capabilityId: typeof body?.capabilityId === 'string' ? body.capabilityId : typeof body?.library?.capabilityId === 'string' ? body.library.capabilityId : undefined,
+              entrySurface: 'studio',
+              destination: body?.library ? 'library' : 'project',
+              referenceCount,
+              isEdit,
+              hasIdempotencyKey: typeof body?.idempotencyKey === 'string' && body.idempotencyKey.length > 0,
+              parameters: body?.parameters && typeof body.parameters === 'object' && !Array.isArray(body.parameters) ? body.parameters : undefined,
+              reason: 'STUDIO_NOT_OPEN',
+              category: 'runtime_unavailable',
+            });
+          }
+          return json(res, 503, { error: 'Open the Studio before generating media' });
+        }
+        return json(res, 202, { job: await gateway.submit(await input(req), undefined, { entrySurface: 'studio' }) });
       }
       if (url.pathname === '/api/generations' && req.method === 'GET') return json(res, 200, { jobs: (await gateway.listJobs(url.searchParams.get('projectId') ?? undefined)).slice(0, 50) });
       const generation = url.pathname.match(/^\/api\/generations\/([a-f0-9-]+)(\/cancel)?$/);
       if (generation && req.method === 'GET' && !generation[2]) return json(res, 200, { job: await gateway.getJob(generation[1]) });
-      if (generation && req.method === 'POST' && generation[2]) return json(res, 200, { job: await gateway.cancel(generation[1]) });
+      if (generation && req.method === 'POST' && generation[2]) return json(res, 200, { job: await gateway.cancel(generation[1], { source: 'studio' }) });
       return json(res, 404, { error: 'Unknown model gateway operation' });
     }
     if (url.pathname === '/api/templates' && req.method === 'GET') return json(res, 200, { templates });
@@ -1798,7 +1845,12 @@ export async function startServer(store = sharedStore, port = Number(process.env
       server.closeAllConnections();
       server.close();
       await context.studio?.close();
-      await Promise.allSettled([closeTracking(context.tracking), flushCodexSessionTracking(store.directory)]);
+      await Promise.allSettled([
+        closeTracking(context.tracking),
+        flushCodexSessionTracking(store.directory),
+        flushHostSessionTracking(store.directory),
+        flushSuperAgentSessionTracking(store.directory),
+      ]);
     },
   };
 }

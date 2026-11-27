@@ -17,6 +17,7 @@ import {
   retireIdleBackend,
   rollbackInstallation,
   stageNpmUpdate,
+  withInstallLock,
 } from '../scripts/opengame-updater.mjs';
 import { runFile, writeJSON } from '../scripts/runtime-assets.mjs';
 import { configureNativeEnvironment, nativeConfiguration, nativeRuntimeStatus } from '../scripts/npm-runtime.mjs';
@@ -348,6 +349,32 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     const origV2Mcp = await readFile(v2McpPath, 'utf8');
     await writeFile(v2McpPath, 'console.error("simulated broken update"); process.exit(1);\n');
 
+    // 10a. Sustained live install.lock contention during crash path logs a skip instead of crashing the launcher with an uncaught throw.
+    const installLockFile = path.join(home, 'install.lock');
+    await writeFile(installLockFile, JSON.stringify({ pid: process.pid, token: 'held-live' }), { mode: 0o600 });
+    try {
+      const contendedCrash = await new Promise<{ code: number | null; stderr: string }>((resolve, reject) => {
+        const child = spawn(process.execPath, [path.join(home, 'run-mcp.mjs')], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, OPENMOTION_TELEMETRY: '0', OPENGAME_AUTO_UPDATE: '0', OPENGAME_MAX_CRASHES: '2', OPENGAME_INSTALL_LOCK_TIMEOUT_MS: '200' },
+        });
+        let stderr = '';
+        child.stderr.on('data', chunk => { stderr += chunk; });
+        child.stdin.write(initLine);
+        const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('run-mcp.mjs hung under install.lock contention')); }, 10_000);
+        child.once('close', code => { clearTimeout(timer); resolve({ code, stderr }); });
+      });
+      assert.equal(contendedCrash.code, 1, contendedCrash.stderr);
+      assert.doesNotMatch(contendedCrash.stderr, /Unhandled|INSTALL_LOCK_BUSY|Another OpenGame operation/);
+      const updateLog = await readFile(path.join(home, 'cache', 'update.log'), 'utf8');
+      assert.match(updateLog, /crash recovery skipped:.*Another OpenGame operation/);
+    } finally {
+      await rm(installLockFile, { force: true });
+    }
+
+    // 10b. A stale install.lock left by an interrupted setup (dead PID) is reclaimed automatically so crash #1 records normally.
+    await writeFile(installLockFile, '2147483647');
+
     // Crash #1 increments crashCount to 1 and exits promptly even while stdin stays open!
     const crash1 = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }>((resolve, reject) => {
       const child = spawn(process.execPath, [path.join(home, 'run-mcp.mjs')], {
@@ -442,7 +469,20 @@ await writeFile(file, JSON.stringify(pkg, null, 2));
     assert.equal(existsSync(path.join(home, 'apps', '0.0.1-obsolete')), false, 'Obsolete app versions should be pruned after healthy promotion');
     assert.equal(existsSync(recoveredState.current.appRoot), false, 'Replaced same-version app directory should be pruned after healthy promotion');
 
+    // Verify withInstallLock reclaims a stale dead-PID install.lock AND manual rollback waits cleanly across brief live-lock contention.
+    await writeFile(installLockFile, '2147483647');
+    let heldReleased = false;
+    let markAcquired!: () => void;
+    const holderAcquired = new Promise<void>(resolve => { markAcquired = resolve; });
+    const holder = withInstallLock(installLockFile, async () => {
+      markAcquired();
+      await new Promise(resolve => setTimeout(resolve, 150));
+      heldReleased = true;
+    });
+    await holderAcquired;
     const manual = await rollbackInstallation({ home, reason: 'manual', markBad: true });
+    await holder;
+    assert.equal(heldReleased, true, 'rollbackInstallation should wait for brief live install.lock holder instead of failing fast');
     assert.equal(manual.rolledBack, true);
     assert.equal(manual.from, v2);
     assert.equal(manual.to, v1);

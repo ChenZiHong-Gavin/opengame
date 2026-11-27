@@ -5,7 +5,7 @@ import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { canonical, nativeComponents, obtainAsset, readJSON, relativePath, runFile, withLock, writeAtomic, writeJSON } from './runtime-assets.mjs';
+import { canonical, nativeComponents, obtainAsset, readJSON, relativePath, runFile, writeAtomic, writeJSON } from './runtime-assets.mjs';
 import { ensureNativeRuntime, nativeConfiguration, startNativePreparation } from './npm-runtime.mjs';
 import { checkSkillOwner, copyHostSkills, defaultOpenGameHome, hostPlan, hosts, managedBy, skillTargets } from './opengame-hosts.mjs';
 import { callInstalledOpenGameTool, checkOpenGameTransport, redact } from './opengame-check-mcp.mjs';
@@ -17,6 +17,7 @@ import {
   rollbackInstallation,
   runManagedMcp,
   stageNpmUpdate,
+  withInstallLock,
   writeInstallState,
 } from './opengame-updater.mjs';
 import { exportDiagnostics, recordDiagnostic } from './diagnostics.mjs';
@@ -178,7 +179,7 @@ export async function setup(options = {}) {
     'Keep user game data and application/cache directories separate');
   await mkdir(home, { recursive: true });
 
-  return withLock(path.join(home, 'install.lock'), async () => {
+  return withInstallLock(path.join(home, 'install.lock'), async () => {
     const previous = await readInstallState(home);
     assert(previous === null || previous.managedBy === managedBy, 'Installation directory belongs to another application');
     assert(!previous || previous.dataDirectory === dataDirectory, 'This OpenGame installation already uses another data directory; choose a separate --home');
@@ -312,7 +313,7 @@ async function bootstrapForDirectMcp(options = {}) {
   if (existing?.managedBy === managedBy && existing.current?.appRoot) return home;
   const dataDirectory = await canonical(options.dataDirectory || path.join(home, 'data'));
   await mkdir(home, { recursive: true });
-  await withLock(path.join(home, 'install.lock'), async () => {
+  await withInstallLock(path.join(home, 'install.lock'), async () => {
     const again = await readInstallState(home);
     if (again?.managedBy === managedBy && again.current?.appRoot) return;
     const archive = path.join(home, 'cache/downloads', manifest.application.sha256 + (manifest.application.url.endsWith('.tar.xz') ? '.tar.xz' : '.tar.gz'));

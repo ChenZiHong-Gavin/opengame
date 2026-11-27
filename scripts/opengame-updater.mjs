@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { appendFile, mkdir, mkdtemp, open, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { appendFile, link, mkdir, mkdtemp, open, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { extractArchive, processAlive, readJSON, runFile, sha256, withCacheLock, withLock, writeJSON } from './runtime-assets.mjs';
+import { extractArchive, processAlive, readJSON, runFile, sha256, withCacheLock, writeJSON } from './runtime-assets.mjs';
 import { checkOpenGameTransport } from './opengame-check-mcp.mjs';
 import { managedBy, syncInstalledHostSkills } from './opengame-hosts.mjs';
 
@@ -15,8 +15,81 @@ export const DEFAULT_NPM_REGISTRIES = ['https://registry.npmjs.org', 'https://re
 export const DEFAULT_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const DEFAULT_HEALTHY_AFTER_MS = 15_000;
 export const DEFAULT_MAX_CRASHES = 2;
+export const DEFAULT_INSTALL_LOCK_TIMEOUT_MS = 5_000;
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function parseLockOwner(raw) {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (/^\d+$/.test(trimmed)) return { pid: Number(trimmed), token: null };
+  try {
+    const parsed = JSON.parse(trimmed);
+    const pid = typeof parsed === 'number' ? parsed : parsed?.pid;
+    return Number.isSafeInteger(pid) ? { pid, token: parsed?.token ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Acquire `install.lock` with dead-PID reclamation and a bounded retry wait.
+ * Reclaims locks left behind by crashed/interrupted setup runs while never stealing
+ * a live owner's lock.
+ */
+export async function withInstallLock(filename, work, { timeoutMs } = {}) {
+  const configured = Number(process.env.OPENGAME_INSTALL_LOCK_TIMEOUT_MS);
+  const waitMs = Number.isFinite(timeoutMs) ? timeoutMs : (Number.isFinite(configured) && configured >= 0 ? configured : DEFAULT_INSTALL_LOCK_TIMEOUT_MS);
+  await mkdir(path.dirname(filename), { recursive: true });
+  const token = randomUUID();
+  const candidate = filename + '.' + token;
+  await writeFile(candidate, JSON.stringify({ pid: process.pid, token }), { mode: 0o600 });
+  const deadline = Date.now() + waitMs;
+  try {
+    for (;;) {
+      try {
+        await link(candidate, filename);
+        break;
+      } catch (error) {
+        if (error.code !== 'EEXIST') throw error;
+      }
+      const raw = await readFile(filename, 'utf8').catch(error => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (raw === null) continue;
+      const owner = parseLockOwner(raw);
+      if (owner?.pid && !processAlive(owner.pid)) {
+        await withCacheLock(filename + '.reclaim', async () => {
+          const currentRaw = await readFile(filename, 'utf8').catch(error => {
+            if (error.code === 'ENOENT') return null;
+            throw error;
+          });
+          if (currentRaw === raw) await rm(filename, { force: true });
+        });
+        continue;
+      }
+      if (Date.now() >= deadline) {
+        throw Object.assign(
+          new Error(`Another OpenGame operation is using ${filename} (pid ${owner?.pid ?? 'unknown'}). Retry after it finishes.`),
+          { code: 'INSTALL_LOCK_BUSY', lockFile: filename, ownerPid: owner?.pid ?? null },
+        );
+      }
+      await pause(50);
+    }
+    try {
+      return await work();
+    } finally {
+      const currentRaw = await readFile(filename, 'utf8').catch(() => null);
+      if (parseLockOwner(currentRaw)?.token === token) {
+        await rm(filename, { force: true });
+      }
+    }
+  } finally {
+    await rm(candidate, { force: true });
+  }
+}
 
 function isAllowedRegistryUrl(raw) {
   try {
@@ -380,14 +453,14 @@ export async function retireIdleBackend(dataDirectory, { fetchImpl = fetch, time
  * `bootstrapForDirectMcp()` so concurrent setup and background updater writes never clobber hosts
  * or current version state. Always acquire `update.lock` before `install.lock` when both are used.
  */
-async function mutateInstallState(home, transform) {
-  return withLock(path.join(home, 'install.lock'), async () => {
+async function mutateInstallState(home, transform, options) {
+  return withInstallLock(path.join(home, 'install.lock'), async () => {
     const latest = await readInstallState(home);
     const outcome = await transform(latest);
     if (!outcome) return { state: latest, result: undefined };
     const written = outcome.next ? await writeInstallState(home, outcome.next) : latest;
     return { state: written, result: outcome.result };
-  });
+  }, options);
 }
 
 async function recordBadVersion(home, version) {
@@ -721,7 +794,8 @@ export async function runManagedMcp({
       let healthTimer;
       if (!currentState.current.healthy && healthyAfterMs >= 0) {
         healthTimer = setTimeout(() => {
-          promotionPromise = markCurrentHealthy(home, version).catch(() => {});
+          promotionPromise = markCurrentHealthy(home, version)
+            .catch(error => logUpdate(home, 'markCurrentHealthy skipped: ' + (error instanceof Error ? error.message : String(error))));
         }, healthyAfterMs);
         healthTimer.unref();
       }
@@ -751,8 +825,13 @@ export async function runManagedMcp({
   try {
     let outcome = await launchOnce(state, true);
     if (!signalReceived && !state.current.healthy && (outcome.code !== 0 || outcome.signal)) {
-      const crash = await recordCrashAndMaybeRollback(home, state.current.version, maxCrashes);
-      await logUpdate(home, `Unverified version ${state.current.version} crashed (count=${crash.crashCount}, rolledBack=${crash.rolledBack})`);
+      const crash = await recordCrashAndMaybeRollback(home, state.current.version, maxCrashes).catch(async error => {
+        await logUpdate(home, `Unverified version ${state.current.version} crash recovery skipped: ${error instanceof Error ? error.message : String(error)}`);
+        return { rolledBack: false, crashCount: 0, skipped: true };
+      });
+      if (!crash.skipped) {
+        await logUpdate(home, `Unverified version ${state.current.version} crashed (count=${crash.crashCount}, rolledBack=${crash.rolledBack})`);
+      }
       if (crash.rolledBack && !stdoutEmitted) {
         console.error(`OpenGame: rolled back broken version ${state.current.version} to ${crash.rollback.to}.`);
         const restored = await readInstallState(home);

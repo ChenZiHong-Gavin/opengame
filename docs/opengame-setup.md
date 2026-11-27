@@ -33,7 +33,7 @@ npm ci
 npm run build:studio
 ```
 
-The shallow clone includes game source, catalog metadata, covers and the complete Tidebreaker game. Other templates keep binary assets in Git LFS. Studio and MCP fetch the selected template's assets on demand and reuse them in this checkout. To prepare a template for offline use, run `git lfs pull --include="templates/games/<game-id>/**" --exclude=""` from the checkout. Optional videos have separate [storage instructions](repository-storage.md).
+The shallow clone includes catalog metadata, covers, Tidebreaker, and the featured showcase templates. The full catalog of additional templates is pinned by SHA-256 in `templates/game-downloads.json` and downloaded on demand from immutable R2 bundles into your workspace cache the first time you play or remix a title. Any remaining in-repo template with Git LFS assets also fetches on demand (or manually via `git lfs pull --include="templates/games/<game-id>/**" --exclude=""`). Optional videos have separate [storage instructions](repository-storage.md).
 
 ## Start a separate workspace
 

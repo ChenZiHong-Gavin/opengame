@@ -1,1 +1,0 @@
-var vm={show:function(){var e=Array.prototype.slice.call(arguments);if(ViewManager)return ViewManager.show(...e);console.log("ViewManager has not created yet ")},hide:function(e,a){if(ViewManager)return ViewManager.hide(e,a);console.log("ViewManager has not created yet ")}};window.vm=vm;

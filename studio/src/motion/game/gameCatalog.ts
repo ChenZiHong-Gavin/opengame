@@ -137,7 +137,7 @@ export async function playableUrl(game: GameCard) {
   if (game.external) return game.external.url;
   if (game.playUrl.startsWith('bundled:')) {
     const load = Object.entries(bundledPages).find(([path]) => folder(path) === game.id)?.[1];
-    if (!load) throw new Error('Game file is missing.');
+    if (!load) throw new Error('Start the local game service to play this template.');
     const html = await load();
     if (needsGameService(html)) throw new Error('Start the local game service to play this template.');
     return URL.createObjectURL(new Blob([html], { type: 'text/html' }));

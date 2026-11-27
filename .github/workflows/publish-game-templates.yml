@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - 'templates/games/**'
+      - 'templates/game-downloads.json'
       - 'scripts/game-template-publication.ts'
       - 'scripts/zip.mjs'
       - 'shared/hosted-game-templates.ts'
